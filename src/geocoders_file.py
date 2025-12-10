@@ -1,5 +1,5 @@
 import time
-from geopy import distance
+import requests
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
 
@@ -62,12 +62,27 @@ class Geocoders:
             if start_coords['latitude'] and start_coords['longitude'] and \
                end_coords['latitude'] and end_coords['longitude']:
 
-                start = (start_coords['latitude'], start_coords['longitude'])
-                end = (end_coords['latitude'], end_coords['longitude'])
-                distance_km = distance.distance(start, end).km
+                try:
+                    lon_start = start_coords['longitude']
+                    lat_start = start_coords['latitude']
+                    lon_end = end_coords['longitude']
+                    lat_end = end_coords['latitude']
 
-                print(distance_km)
-                return distance_km
+                    url = f"https://router.project-osrm.org/route/v1/driving/{lon_start},{lat_start};{lon_end},{lat_end}?overview=false"
+
+                    response = requests.get(url, timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data['routes']:
+                            # Distance in meters, convert to km
+                            distance_km = data['routes'][0]['distance'] / 1000
+                            print(f"Distance exacte :{distance_km:.2f}km")
+                            return distance_km
+                    else:
+                        print(f"OSRM API error: {response.status_code}")
+
+                except requests.exceptions.RequestException as error:
+                    print(f"Problem calculating distance with OSRM: {error}")
 
         print("Unable to calculate distance - missing coordinates")
 
