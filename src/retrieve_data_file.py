@@ -11,8 +11,7 @@ class RetrieverData:
             os.getcwd(),
             "data",
             "xml",
-            "essence",
-            "PrixCarburants_instantane.xml"
+            "PrixCarburants_quotidien_20251203.xml"
         )
 
         with open(data_xml, "r") as file:
@@ -30,8 +29,8 @@ class RetrieverData:
             if not city_tag or not address_tag:
                 continue
 
-            city = city_tag.text.strip()
-            address = address_tag.text.strip()
+            city = city_tag.text.strip().upper()
+            address = address_tag.text.strip().upper()
 
             if city not in dictionary_fuel:
                 dictionary_fuel[city] = {}
