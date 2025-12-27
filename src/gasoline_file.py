@@ -1,11 +1,56 @@
-''' Cron : data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/parquet '''
-
 import os
 import json
+import shutil
 import pandas as pd
 
 class Gasoline:
     ''' Class to retrieve data from different extension files '''
+
+    def __init__(self):
+        ''' Constructor of the Gasoline class '''
+
+        self.curl_parquet = (
+            "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/parquet"
+        )
+
+        self.download_parquet_file()
+
+    # -----
+
+    def download_parquet_file(self) -> None:
+        ''' Method to download the Parquet file '''
+
+        data_dir = os.path.join(
+            os.getcwd(),
+            "data",
+            "parquet"
+        )
+        os.makedirs(data_dir, exist_ok=True)
+
+        file_path = os.path.join(data_dir, "prix-des-carburants-en-france-flux-instantane-v2.parquet")
+        new_file_path = os.path.join(
+            data_dir,
+            'prix-des-carburants-en-france-flux-instantane-v2_old.parquet'
+        )
+
+        if not os.path.isfile(file_path):
+            os.system(f"curl -o {file_path} {self.curl_parquet}")
+
+        if os.path.isfile(file_path):
+            if os.path.isfile(new_file_path):
+
+                os.remove(new_file_path)
+
+            shutil.copy(
+                file_path,
+                new_file_path
+            )
+            os.remove(file_path)
+            os.system(f"curl -o {file_path} {self.curl_parquet}")
+
+        return None
+
+    # -----
 
     def get_data_fuel_method(self) -> dict:
         ''' Method to retrieve fuel data from a Parquet file '''
