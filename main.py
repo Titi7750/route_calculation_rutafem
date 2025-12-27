@@ -1,7 +1,6 @@
 ''' Python version : 3.13.9 '''
 
 from src.geocoders_file import Geocoders
-from src.retrieve_data_file import RetrieverData
 
 def main() -> None:
 
