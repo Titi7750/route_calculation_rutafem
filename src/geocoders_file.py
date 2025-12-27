@@ -47,7 +47,7 @@ class Geocoders:
 
     # -----
 
-    def geocode_distance_method(self, param_locations: dict) -> None:
+    def geocode_distance_method(self, param_locations: dict) -> float | None:
         ''' Method to geocode distance between two locations using location_dictionary '''
 
         location_dictionary = self.geocode_longitude_latitude_method(param_locations)
@@ -58,32 +58,45 @@ class Geocoders:
         start_coords = location_dictionary['start'].get(start_location)
         end_coords = location_dictionary['end'].get(end_location)
 
-        if start_coords and end_coords:
-            if start_coords['latitude'] and start_coords['longitude'] and \
-               end_coords['latitude'] and end_coords['longitude']:
+        if not start_coords or not end_coords:
 
-                try:
-                    lon_start = start_coords['longitude']
-                    lat_start = start_coords['latitude']
-                    lon_end = end_coords['longitude']
-                    lat_end = end_coords['latitude']
+            print("Could not retrieve coordinates for one or both locations")
+            return None
 
-                    url = f"https://router.project-osrm.org/route/v1/driving/{lon_start},{lat_start};{lon_end},{lat_end}?overview=false"
+        if start_coords['latitude'] is None and start_coords['longitude'] is None and \
+            end_coords['latitude'] is None and end_coords['longitude'] is None:
 
-                    response = requests.get(url, timeout=10)
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data['routes']:
-                            # Distance in meters, convert to km
-                            distance_km = data['routes'][0]['distance'] / 1000
-                            print(f"Distance exacte :{distance_km:.2f}km")
-                            return distance_km
-                    else:
-                        print(f"OSRM API error: {response.status_code}")
+            print("Both locations could not be geocoded")
+            return None
 
-                except requests.exceptions.RequestException as error:
-                    print(f"Problem calculating distance with OSRM: {error}")
+        lon_start = start_coords['longitude']
+        lat_start = start_coords['latitude']
+        lon_end = end_coords['longitude']
+        lat_end = end_coords['latitude']
 
-        print("Unable to calculate distance - missing coordinates")
+        url = f"https://router.project-osrm.org/route/v1/driving/{lon_start},{lat_start};{lon_end},{lat_end}"
+        url_params = {
+            'overview': 'false',
+            'alternatives': 'false',
+            'steps': 'false'
+        }
+
+        try:
+            response = requests.get(url, params=url_params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            routes = data.get('routes', [])
+            if not routes:
+
+                print("No routes found in OSRM response")
+                return None
+
+            distance_km = round(routes[0]['distance'] / 1000, 2)
+
+            return distance_km
+
+        except requests.exceptions.RequestException as error:
+            print(f"Problem calculating distance with OSRM: {error}")
 
         return None
