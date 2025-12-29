@@ -1,6 +1,7 @@
 import os
 import json
 import shutil
+import subprocess
 import pandas as pd
 
 class Gasoline:
@@ -33,20 +34,30 @@ class Gasoline:
             'prix-des-carburants-en-france-flux-instantane-v2_old.parquet'
         )
 
-        if not os.path.isfile(file_path):
-            os.system(f"curl -o {file_path} {self.curl_parquet}")
+        try:
+            if not os.path.isfile(file_path):
+                subprocess.run([
+                    "curl", "-o", file_path, self.curl_parquet
+                ], check=True, capture_output=True, text=True)
 
-        if os.path.isfile(file_path):
+            if os.path.isfile(file_path):
+                if os.path.isfile(new_file_path):
+                    os.remove(new_file_path)
+
+                shutil.copy(file_path, new_file_path)
+                os.remove(file_path)
+                
+                subprocess.run([
+                    "curl", "-o", file_path, self.curl_parquet
+                ], check=True, capture_output=True, text=True)
+                
+        except subprocess.CalledProcessError as e:
+            print(f"Error downloading parquet file: {e}")
+
             if os.path.isfile(new_file_path):
-
-                os.remove(new_file_path)
-
-            shutil.copy(
-                file_path,
-                new_file_path
-            )
-            os.remove(file_path)
-            os.system(f"curl -o {file_path} {self.curl_parquet}")
+                shutil.copy(new_file_path, file_path)
+        except Exception as e:
+            print(f"Unexpected error during download: {e}")
 
         return None
 

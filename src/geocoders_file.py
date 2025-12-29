@@ -40,8 +40,18 @@ class Geocoders:
                     time.sleep(1)
 
                 except GeocoderTimedOut as error:
-
-                    print(f"Problem geocoding {error}")
+                    print(f"Problem geocoding {location}: {error}")
+                    location_dictionary[key][location] = {
+                        'latitude': None,
+                        'longitude': None
+                    }
+                
+                except Exception as error:
+                    print(f"Unexpected error geocoding {location}: {error}")
+                    location_dictionary[key][location] = {
+                        'latitude': None,
+                        'longitude': None
+                    }
 
         return location_dictionary
 
@@ -59,13 +69,11 @@ class Geocoders:
         end_coords = location_dictionary['end'].get(end_location)
 
         if not start_coords or not end_coords:
-
             print("Could not retrieve coordinates for one or both locations")
             return None
 
-        if start_coords['latitude'] is None and start_coords['longitude'] is None and \
-            end_coords['latitude'] is None and end_coords['longitude'] is None:
-
+        if start_coords['latitude'] is None or start_coords['longitude'] is None or \
+            end_coords['latitude'] is None or end_coords['longitude'] is None:
             print("Both locations could not be geocoded")
             return None
 
