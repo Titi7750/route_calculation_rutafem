@@ -13,7 +13,7 @@ class Geocoders:
 
     # -----
 
-    def geocode_longitude_latitude_method(self, param_locations: dict) -> dict:
+    def _geocode_longitude_latitude_method(self, param_locations: dict) -> dict:
         ''' Method to get longitude and latitude of a location '''
 
         location_dictionary = {}

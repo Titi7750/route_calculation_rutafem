@@ -12,9 +12,7 @@ def main() -> None:
         param_liter_km=5,
         param_toll=65,
         param_persons=3,
-        param_fuel_type="Gazole",
-        param_city="Paris",
-        param_address="101 BLD MORTIER"
+        param_fuel_type="Gazole"
     )
 
     if result['success']:

@@ -14,11 +14,11 @@ class Gasoline:
             "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/parquet"
         )
 
-        self.download_parquet_file_method()
+        self._download_parquet_file_method()
 
     # -----
 
-    def download_parquet_file_method(self) -> None:
+    def _download_parquet_file_method(self) -> None:
         ''' Method to download the Parquet file '''
 
         data_dir = os.path.join(
