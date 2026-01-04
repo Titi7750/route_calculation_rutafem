@@ -14,7 +14,7 @@ class RouteCalculator:
 
     # -----
 
-    def _calculate_route_method(
+    def calculate_route_method(
         self,
         param_distance: float,
         param_liter_km: float,
@@ -97,7 +97,7 @@ class RouteCalculator:
                     'fuel_price': None
                 }
 
-            cost_per_person = self._calculate_route_method(
+            cost_per_person = self.calculate_route_method(
                 distance,
                 param_liter_km,
                 fuel_price,

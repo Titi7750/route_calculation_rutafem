@@ -1,6 +1,8 @@
 ''' A Streamlit interface for route calculation '''
 
 import streamlit as st
+from src.gasoline_file import Gasoline
+from src.geocoders_file import Geocoders
 from src.calculator_file import RouteCalculator
 
 class StreamlitCalculationGenerator:
@@ -17,7 +19,6 @@ class StreamlitCalculationGenerator:
         liter_km, fuel_type = self._get_fuel_inputs()
         toll, persons = self._get_toll_and_persons_inputs()
 
-        # Calculate route if button is clicked
         if st.sidebar.button("Calculate Route", use_container_width=True):
             self._calculate_and_display_route(
                 start_location, end_location, liter_km, fuel_type, toll, persons
@@ -51,23 +52,80 @@ class StreamlitCalculationGenerator:
         ''' Get start and end location inputs '''
 
         st.sidebar.header("Route Parameters")
-        start_col, end_col = st.columns(2)
 
+        start_col, end_col = st.columns(2)
         with start_col:
             start_location = st.text_input(
                 "Start Location",
-                value="Paris",
                 placeholder="Paris"
             )
 
         with end_col:
             end_location = st.text_input(
                 "End Location",
-                value="Lyon",
                 placeholder="Lyon"
             )
 
+        if start_location:
+            with st.expander("Find Nearby Gas Stations"):
+                self._display_nearby_gas_stations(start_location)
+
         return start_location, end_location
+
+    # -----
+
+    def _display_nearby_gas_stations(self, start_location: str) -> None:
+        ''' Display nearby gas stations for the start location '''
+
+        try:
+            search_radius = st.slider(
+                "Search radius (km)",
+                min_value=10,
+                max_value=100,
+                value=50,
+                step=10
+            )
+
+            with st.spinner("Finding nearby gas stations..."):
+                gasoline = Gasoline()
+                geocoders = Geocoders()
+
+                fuel_data = gasoline.get_data_fuel_method()
+
+                closest_stations = geocoders.find_closest_gas_stations_method(
+                    param_start_location=start_location,
+                    param_fuel_data=fuel_data,
+                    param_max_results=5,
+                    param_max_distance_km=search_radius
+                )
+
+                if closest_stations:
+                    for index, station in enumerate(closest_stations, 1):
+                        with st.container():
+                            col1, col2 = st.columns([2, 1])
+                            with col1:
+                                st.write(f"**#{index} {station['address']}**")
+                                st.write(f"{station['city']}")
+
+                            with col2:
+                                st.metric(
+                                    "Distance",
+                                    f"{station['distance_km']} km"
+                                )
+
+                            if station['fuel_prices']:
+                                prices_text = ", ".join(
+                                    [f"{fuel_type}: €{price}"
+                                     for fuel_type, price in station['fuel_prices'].items()]
+                                )
+                                st.write(f"{prices_text}")
+
+                            st.divider()
+                else:
+                    st.warning(f"No gas stations found within {search_radius}km of {start_location}")
+
+        except Exception as e:
+            st.error(f"Error finding gas stations: {str(e)}")
 
     # -----
 
@@ -125,32 +183,71 @@ class StreamlitCalculationGenerator:
         param_toll: float,
         param_persons: int
     ) -> None:
-        ''' Calculate route and display results '''
+        ''' Calculate route and display results using closest gas station price or selected station '''
 
         with st.spinner("Calculating route..."):
             try:
-                route = RouteCalculator()
-                result = route.get_route_data_method(
+                gasoline = Gasoline()
+                geocoders = Geocoders()
+
+                fuel_data = gasoline.get_data_fuel_method()
+                closest_stations = geocoders.find_closest_gas_stations_method(
                     param_start_location=param_start_location,
-                    param_end_location=param_end_location,
-                    param_liter_km=param_liter_km,
-                    param_toll=param_toll,
-                    param_persons=param_persons,
-                    param_fuel_type=param_fuel_type
+                    param_fuel_data=fuel_data,
+                    param_max_results=1,
+                    param_max_distance_km=100.0
                 )
 
-                if result['success']:
-                    self._display_success_results(
-                        result,
-                        param_start_location,
-                        param_end_location,
-                        param_liter_km,
-                        param_fuel_type,
-                        param_toll,
-                        param_persons
-                    )
+                closest_station = None
+                closest_fuel_price = None
+
+                if closest_stations:
+                    closest_station = closest_stations[0]
+                    closest_fuel_price = closest_station['fuel_prices'].get(param_fuel_type)
+
+                if closest_fuel_price:
+                    closest_fuel_price = float(closest_fuel_price)
+
+                    locations = {
+                        'start': param_start_location,
+                        'end': param_end_location
+                    }
+                    distance = geocoders.geocode_distance_method(locations)
+
+                    if distance is not None:
+                        route = RouteCalculator()
+                        cost_per_person = route.calculate_route_method(
+                            distance,
+                            param_liter_km,
+                            closest_fuel_price,
+                            param_toll,
+                            param_persons
+                        )
+                        total_cost = cost_per_person * param_persons
+
+                        result = {
+                            'success': True,
+                            'error': None,
+                            'cost_per_person': cost_per_person,
+                            'total_cost': round(total_cost, 2),
+                            'distance': distance,
+                            'fuel_price': closest_fuel_price,
+                            'closest_station': closest_station
+                        }
+
+                        self._display_success_results(
+                            result,
+                            param_start_location,
+                            param_end_location,
+                            param_liter_km,
+                            param_fuel_type,
+                            param_toll,
+                            param_persons
+                        )
+                    else:
+                        st.error("Could not calculate distance between locations")
                 else:
-                    st.error(f"Error: {result['error']}")
+                    st.error(f"Could not find fuel price for {param_fuel_type} at selected stations")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
@@ -161,7 +258,7 @@ class StreamlitCalculationGenerator:
 
     def _display_success_results(
         self,
-        result: dict,
+        param_result: dict,
         param_start_location: str,
         param_end_location: str,
         param_liter_km: float,
@@ -171,9 +268,11 @@ class StreamlitCalculationGenerator:
     ) -> None:
         ''' Display successful calculation results '''
 
-        st.success("Route calculation successful !")
+        if param_result.get('closest_station'):
+            with st.info(f"Fuel price from: **{param_result['closest_station']['address']}** ({param_result['closest_station']['distance_km']} km away)"):
+                pass
 
-        self._display_key_metrics(result)
+        self._display_key_metrics(param_result)
         self._display_summary(
             param_start_location,
             param_end_location,
@@ -183,7 +282,7 @@ class StreamlitCalculationGenerator:
             param_persons
         )
         self._display_cost_breakdown(
-            result,
+            param_result,
             param_toll,
             param_persons
         )

@@ -73,7 +73,7 @@ class Gasoline:
     # -----
 
     def get_data_fuel_method(self) -> dict:
-        ''' Method to retrieve fuel data from a Parquet file '''
+        ''' Method to retrieve fuel data including latitude and longitude from parquet file '''
 
         data_parquet = os.path.join(
             os.getcwd(),
@@ -95,7 +95,25 @@ class Gasoline:
                 dictionary_fuel[fuel_key] = {}
 
             if row['adresse'] not in dictionary_fuel[fuel_key]:
-                dictionary_fuel[fuel_key][row['adresse']] = {}
+                try:
+                    lat = float(row.get('latitude')) if row.get('latitude') is not None else None
+                    lon = float(row.get('longitude')) if row.get('longitude') is not None else None
+
+                    if lat is not None and (lat > 90 or lat < -90): # -90 to 90 (S to N)
+                        lat = lat / 100000
+                    if lon is not None and (lon > 180 or lon < -180): # -180 to 180 (W to E)
+                        lon = lon / 100000
+
+                    latitude = lat
+                    longitude = lon
+                except (ValueError, TypeError):
+                    latitude = None
+                    longitude = None
+
+                dictionary_fuel[fuel_key][row['adresse']] = {
+                    'latitude': latitude,
+                    'longitude': longitude
+                }
 
             if isinstance(row['prix'], str):
                 try:
