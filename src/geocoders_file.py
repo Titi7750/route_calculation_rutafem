@@ -1,3 +1,5 @@
+''' Module to handle geocoding operations '''
+
 import time
 import requests
 from geopy.geocoders import Nominatim
@@ -13,60 +15,42 @@ class Geocoders:
 
     # -----
 
-    def _geocode_longitude_latitude_method(self, param_locations: dict) -> dict:
-        ''' Method to get longitude and latitude of a location '''
+    def _geocode_longitude_latitude_method(self, param_location: str) -> dict:
+        ''' Method to get longitude and latitude of a single location '''
 
-        location_dictionary = {}
-        for key, location in param_locations.items():
-            location_dictionary[key] = {}
+        try:
+            geo_location = self.geolocator.geocode(param_location, timeout=10)
+            if geo_location:
+                return {
+                    'latitude': geo_location.latitude,
+                    'longitude': geo_location.longitude
+                }
+            else:
+                return {
+                    'latitude': None,
+                    'longitude': None
+                }
 
-            locations = location if isinstance(location, list) else [location]
+        except GeocoderTimedOut as error:
+            print(f"Problem geocoding {param_location}: {error}")
+            return {'latitude': None, 'longitude': None}
 
-            for location in locations:
-                try:
-                    geo_location = self.geolocator.geocode(location, timeout=10)
-
-                    if geo_location:
-                        location_dictionary[key][location] = {
-                            'latitude': geo_location.latitude,
-                            'longitude': geo_location.longitude
-                        }
-                    else:
-                        location_dictionary[key][location] = {
-                            'latitude': None,
-                            'longitude': None
-                        }
-
-                    time.sleep(1)
-
-                except GeocoderTimedOut as error:
-                    print(f"Problem geocoding {location}: {error}")
-                    location_dictionary[key][location] = {
-                        'latitude': None,
-                        'longitude': None
-                    }
-
-                except Exception as error:
-                    print(f"Unexpected error geocoding {location}: {error}")
-                    location_dictionary[key][location] = {
-                        'latitude': None,
-                        'longitude': None
-                    }
-
-        return location_dictionary
+        except Exception as error:
+            print(f"Unexpected error geocoding {param_location}: {error}")
+            return {'latitude': None, 'longitude': None}
 
     # -----
 
     def geocode_distance_method(self, param_locations: dict) -> float | None:
-        ''' Method to geocode distance between two locations using location_dictionary '''
-
-        location_dictionary = self._geocode_longitude_latitude_method(param_locations)
+        ''' Method to calculate distance between two locations '''
 
         start_location = param_locations['start']
         end_location = param_locations['end']
 
-        start_coords = location_dictionary['start'].get(start_location)
-        end_coords = location_dictionary['end'].get(end_location)
+        start_coords = self._geocode_longitude_latitude_method(start_location)
+        time.sleep(1)
+        end_coords = self._geocode_longitude_latitude_method(end_location)
+        time.sleep(1)
 
         if not start_coords or not end_coords:
             print("Could not retrieve coordinates for one or both locations")

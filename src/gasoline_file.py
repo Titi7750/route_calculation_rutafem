@@ -1,3 +1,5 @@
+''' Module to handle gasoline data files '''
+
 import os
 import json
 import shutil
@@ -36,9 +38,11 @@ class Gasoline:
 
         try:
             if not os.path.isfile(file_path):
+                print("Downloading parquet file from API...")
                 subprocess.run([
                     "curl", "-o", file_path, self.curl_parquet
                 ], check=True, capture_output=True, text=True)
+                print("Download completed successfully.")
 
             if os.path.isfile(file_path):
                 if os.path.isfile(new_file_path):
@@ -47,15 +51,20 @@ class Gasoline:
                 shutil.copy(file_path, new_file_path)
                 os.remove(file_path)
 
+                print("Updating parquet file...")
                 subprocess.run([
                     "curl", "-o", file_path, self.curl_parquet
                 ], check=True, capture_output=True, text=True)
+                print("Update completed successfully.")
 
         except subprocess.CalledProcessError as e:
-            print(f"Error downloading parquet file: {e}")
+            print(f"Error downloading parquet file: {e.stderr if e.stderr else e}")
 
             if os.path.isfile(new_file_path):
+                print("Restoring backup file...")
                 shutil.copy(new_file_path, file_path)
+            else:
+                print("Warning: No backup file available.")
         except Exception as e:
             print(f"Unexpected error during download: {e}")
 
@@ -72,6 +81,10 @@ class Gasoline:
             "parquet",
             "prix-des-carburants-en-france-flux-instantane-v2.parquet"
         )
+
+        if not os.path.isfile(data_parquet):
+            raise FileNotFoundError(f"Parquet file not found at {data_parquet}. Please ensure data has been downloaded.")
+
         fuel_dataframe = pd.read_parquet(data_parquet)
 
         dictionary_fuel = {}

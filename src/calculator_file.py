@@ -1,3 +1,5 @@
+''' A module to calculate routes using geocoding and fuel data '''
+
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
 
@@ -50,9 +52,7 @@ class RouteCalculator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int,
-        param_city: str = None,
-        param_address: str = None
+        param_persons: int
     ) -> dict:
         ''' Calculate route cost using geocoding and real fuel prices '''
 
@@ -70,19 +70,11 @@ class RouteCalculator:
                     'cost_per_person': None,
                     'total_cost': None,
                     'distance': None,
-                    'fuel_city': None,
-                    'fuel_address': None,
                     'fuel_price': None
                 }
 
             fuel_data = self.gasoline.get_data_fuel_method()
             fuel_price = None
-
-            if param_city and param_address in fuel_data and param_address in fuel_data[param_city]:
-                prices = fuel_data[param_city][param_address].get('prix', {})
-                fuel_price = prices.get(param_fuel_type)
-                if fuel_price:
-                    fuel_price = float(fuel_price)
 
             if fuel_price is None:
                 for city_data in fuel_data.values():
@@ -102,8 +94,6 @@ class RouteCalculator:
                     'cost_per_person': None,
                     'total_cost': None,
                     'distance': distance,
-                    'fuel_city': None,
-                    'fuel_address': None,
                     'fuel_price': None
                 }
 
@@ -122,8 +112,6 @@ class RouteCalculator:
                 'cost_per_person': cost_per_person,
                 'total_cost': round(total_cost, 2),
                 'distance': distance,
-                'fuel_city': param_city,
-                'fuel_address': param_address,
                 'fuel_price': fuel_price
             }
 
@@ -134,7 +122,5 @@ class RouteCalculator:
                 'cost_per_person': None,
                 'total_cost': None,
                 'distance': None,
-                'fuel_city': None,
-                'fuel_address': None,
                 'fuel_price': None
             }
