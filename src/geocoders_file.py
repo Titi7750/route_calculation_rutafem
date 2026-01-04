@@ -45,7 +45,7 @@ class Geocoders:
                         'latitude': None,
                         'longitude': None
                     }
-                
+
                 except Exception as error:
                     print(f"Unexpected error geocoding {location}: {error}")
                     location_dictionary[key][location] = {
@@ -60,7 +60,7 @@ class Geocoders:
     def geocode_distance_method(self, param_locations: dict) -> float | None:
         ''' Method to geocode distance between two locations using location_dictionary '''
 
-        location_dictionary = self.geocode_longitude_latitude_method(param_locations)
+        location_dictionary = self._geocode_longitude_latitude_method(param_locations)
 
         start_location = param_locations['start']
         end_location = param_locations['end']

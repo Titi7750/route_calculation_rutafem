@@ -12,7 +12,14 @@ class RouteCalculator:
 
     # -----
 
-    def calculate_route_method(self, param_distance: float, param_liter_km: float, param_fuel_price: float, param_toll: float, param_persons: int) -> float:
+    def _calculate_route_method(
+        self,
+        param_distance: float,
+        param_liter_km: float,
+        param_fuel_price: float,
+        param_toll: float,
+        param_persons: int
+    ) -> float:
         ''' Calculate the total cost based on provided parameters '''
 
         if param_distance <= 0:
@@ -36,7 +43,17 @@ class RouteCalculator:
 
     # -----
 
-    def get_route_data_method(self, param_start_location: str, param_end_location: str, param_liter_km: float, param_fuel_type: str, param_toll: float, param_persons: int, param_city: str = None, param_address: str = None) -> dict:
+    def get_route_data_method(
+        self,
+        param_start_location: str,
+        param_end_location: str,
+        param_liter_km: float,
+        param_fuel_type: str,
+        param_toll: float,
+        param_persons: int,
+        param_city: str = None,
+        param_address: str = None
+    ) -> dict:
         ''' Calculate route cost using geocoding and real fuel prices '''
 
         try:
@@ -90,7 +107,13 @@ class RouteCalculator:
                     'fuel_price': None
                 }
 
-            cost_per_person = self.calculate_route_method(distance, param_liter_km, fuel_price, param_toll, param_persons)
+            cost_per_person = self._calculate_route_method(
+                distance,
+                param_liter_km,
+                fuel_price,
+                param_toll,
+                param_persons
+            )
             total_cost = cost_per_person * param_persons
 
             return {

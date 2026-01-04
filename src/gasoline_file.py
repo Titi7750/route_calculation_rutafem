@@ -46,11 +46,11 @@ class Gasoline:
 
                 shutil.copy(file_path, new_file_path)
                 os.remove(file_path)
-                
+
                 subprocess.run([
                     "curl", "-o", file_path, self.curl_parquet
                 ], check=True, capture_output=True, text=True)
-                
+
         except subprocess.CalledProcessError as e:
             print(f"Error downloading parquet file: {e}")
 
