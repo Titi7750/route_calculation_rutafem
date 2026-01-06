@@ -45,82 +45,82 @@ class RouteCalculator:
 
     # -----
 
-    def get_route_data_method(
-        self,
-        param_start_location: str,
-        param_end_location: str,
-        param_liter_km: float,
-        param_fuel_type: str,
-        param_toll: float,
-        param_persons: int
-    ) -> dict:
-        ''' Calculate route cost using geocoding and real fuel prices '''
+    # def get_route_data_method(
+    #     self,
+    #     param_start_location: str,
+    #     param_end_location: str,
+    #     param_liter_km: float,
+    #     param_fuel_type: str,
+    #     param_toll: float,
+    #     param_persons: int
+    # ) -> dict:
+    #     ''' Calculate route cost using geocoding and real fuel prices '''
 
-        try:
-            locations = {
-                'start': param_start_location,
-                'end': param_end_location
-            }
-            distance = self.geocoder.geocode_distance_method(locations)
+    #     try:
+    #         locations = {
+    #             'start': param_start_location,
+    #             'end': param_end_location
+    #         }
+    #         distance = self.geocoder.geocode_distance_method(locations)
 
-            if distance is None:
-                return {
-                    'success': False,
-                    'error': 'Could not calculate distance between locations',
-                    'cost_per_person': None,
-                    'total_cost': None,
-                    'distance': None,
-                    'fuel_price': None
-                }
+    #         if distance is None:
+    #             return {
+    #                 'success': False,
+    #                 'error': 'Could not calculate distance between locations',
+    #                 'cost_per_person': None,
+    #                 'total_cost': None,
+    #                 'distance': None,
+    #                 'fuel_price': None
+    #             }
 
-            fuel_data = self.gasoline.get_data_fuel_method()
-            fuel_price = None
+    #         fuel_data = self.gasoline.get_data_fuel_method()
+    #         fuel_price = None
 
-            if fuel_price is None:
-                for city_data in fuel_data.values():
-                    for address_data in city_data.values():
-                        prices = address_data.get('prix', {})
-                        if param_fuel_type in prices:
-                            fuel_price = float(prices[param_fuel_type])
-                            break
+    #         if fuel_price is None:
+    #             for city_data in fuel_data.values():
+    #                 for address_data in city_data.values():
+    #                     prices = address_data.get('prix', {})
+    #                     if param_fuel_type in prices:
+    #                         fuel_price = float(prices[param_fuel_type])
+    #                         break
 
-                    if fuel_price:
-                        break
+    #                 if fuel_price:
+    #                     break
 
-            if fuel_price is None:
-                return {
-                    'success': False,
-                    'error': f'Could not find fuel price for {param_fuel_type}',
-                    'cost_per_person': None,
-                    'total_cost': None,
-                    'distance': distance,
-                    'fuel_price': None
-                }
+    #         if fuel_price is None:
+    #             return {
+    #                 'success': False,
+    #                 'error': f'Could not find fuel price for {param_fuel_type}',
+    #                 'cost_per_person': None,
+    #                 'total_cost': None,
+    #                 'distance': distance,
+    #                 'fuel_price': None
+    #             }
 
-            cost_per_person = self.calculate_route_method(
-                distance,
-                param_liter_km,
-                fuel_price,
-                param_toll,
-                param_persons
-            )
-            total_cost = cost_per_person * param_persons
+    #         cost_per_person = self.calculate_route_method(
+    #             distance,
+    #             param_liter_km,
+    #             fuel_price,
+    #             param_toll,
+    #             param_persons
+    #         )
+    #         total_cost = cost_per_person * param_persons
 
-            return {
-                'success': True,
-                'error': None,
-                'cost_per_person': cost_per_person,
-                'total_cost': round(total_cost, 2),
-                'distance': distance,
-                'fuel_price': fuel_price
-            }
+    #         return {
+    #             'success': True,
+    #             'error': None,
+    #             'cost_per_person': cost_per_person,
+    #             'total_cost': round(total_cost, 2),
+    #             'distance': distance,
+    #             'fuel_price': fuel_price
+    #         }
 
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'cost_per_person': None,
-                'total_cost': None,
-                'distance': None,
-                'fuel_price': None
-            }
+    #     except Exception as e:
+    #         return {
+    #             'success': False,
+    #             'error': str(e),
+    #             'cost_per_person': None,
+    #             'total_cost': None,
+    #             'distance': None,
+    #             'fuel_price': None
+    #         }
