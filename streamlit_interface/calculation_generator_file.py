@@ -1,5 +1,6 @@
 ''' A Streamlit interface for route calculation '''
 
+import requests
 import streamlit as st
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
@@ -62,26 +63,93 @@ class StreamlitCalculationGenerator:
 
     # -----
 
+    def _get_all_french_cities_from_api(self) -> list[str]:
+        ''' Get ALL French cities from government API (36,000+ communes) '''
+        
+        try:
+            # Cache pour éviter de refaire l'appel à chaque fois
+            if 'french_cities_cache' not in st.session_state:
+                with st.spinner("Chargement de toutes les communes françaises..."):
+                    response = requests.get(
+                        "https://geo.api.gouv.fr/communes?fields=nom,population&format=json",
+                        timeout=15
+                    )
+
+                    if response.status_code == 200:
+                        communes = response.json()
+
+                        cities = []
+                        for commune in communes:
+                            if commune.get('population', 0) > 500:
+                                cities.append(commune['nom'])
+
+                        clean_cities = sorted(set(cities))
+                        st.session_state.french_cities_cache = clean_cities
+
+                    else:
+                        st.error("Erreur lors du chargement des communes françaises")
+                        st.session_state.french_cities_cache = []
+
+            return st.session_state.french_cities_cache
+
+        except Exception as e:
+            st.error(f"Erreur de connexion à l'API: {e}")
+            return []
+
+    # -----
+
     def _get_location_inputs(self) -> tuple[str, str]:
-        ''' Get start and end location inputs '''
+        ''' Get start and end location inputs with all french cities from API '''
 
         st.sidebar.header("Route Parameters")
 
+        all_french_cities = self._get_all_french_cities_from_api()
+        
+        if not all_french_cities:
+            st.sidebar.error("Impossible de charger les villes. Vérifiez votre connexion internet.")
+            return "", ""
+
         start_col, end_col = st.columns(2)
         with start_col:
-            start_location = st.text_input(
-                "Start Location",
-                placeholder="Paris"
+            start_location = st.selectbox(
+                "Ville de départ",
+                options=[""] + all_french_cities,
+                index=0,
+                placeholder="Tapez pour rechercher une ville...",
+                help=f"Recherchez parmi {len(all_french_cities):,} communes françaises"
             )
+
+            if start_location == "":
+                start_custom = st.text_input(
+                    "Ou saisissez une adresse complète:",
+                    placeholder="15 Rue de Rivoli, Paris, France",
+                    key="start_custom",
+                    help="Adresse précise, code postal, région..."
+                )
+                if start_custom:
+                    start_location = start_custom
 
         with end_col:
-            end_location = st.text_input(
-                "End Location",
-                placeholder="Lyon"
+            end_location = st.selectbox(
+                "Ville d'arrivée", 
+                options=[""] + all_french_cities,
+                index=0,
+                placeholder="Tapez pour rechercher une ville...",
+                help=f"Recherchez parmi {len(all_french_cities):,} communes françaises"
             )
 
-        if start_location:
-            with st.expander("Find Nearby Gas Stations"):
+            if end_location == "":
+                end_custom = st.text_input(
+                    "Ou saisissez une adresse complète:",
+                    placeholder="Place Bellecour, Lyon, France",
+                    key="end_custom",
+                    help="Adresse précise, code postal, région..."
+                )
+                if end_custom:
+                    end_location = end_custom
+
+        if start_location and start_location != "":
+            with st.expander("Trouver des stations-service proches"):
                 self._display_nearby_gas_stations(start_location)
 
         return start_location, end_location
