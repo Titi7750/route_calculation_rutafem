@@ -15,13 +15,14 @@ class StreamlitCalculationGenerator:
         self._display_title()
 
         # Get user inputs
+        commission = self._get_commission_input()
         start_location, end_location = self._get_location_inputs()
         liter_km, fuel_type = self._get_fuel_inputs()
         toll, persons = self._get_toll_and_persons_inputs()
 
         if st.sidebar.button("Calculate Route", use_container_width=True):
             self._calculate_and_display_route(
-                start_location, end_location, liter_km, fuel_type, toll, persons
+                start_location, end_location, liter_km, fuel_type, toll, persons, commission
             )
 
         return None
@@ -45,6 +46,19 @@ class StreamlitCalculationGenerator:
         st.title("Rutafem - Route Calculator")
 
         return None
+
+    # -----
+
+    def _get_commission_input(self) -> bool:
+        ''' Get commission inclusion input '''
+
+        st.sidebar.subheader("Commission")
+        commission = st.sidebar.checkbox(
+            "Include 15% commission",
+            value=True
+        )
+
+        return commission
 
     # -----
 
@@ -181,7 +195,8 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> None:
         ''' Calculate route and display results using closest gas station price or selected station '''
 
@@ -221,7 +236,8 @@ class StreamlitCalculationGenerator:
                             param_liter_km,
                             closest_fuel_price,
                             param_toll,
-                            param_persons
+                            param_persons,
+                            param_commission=param_commission
                         )
                         total_cost = cost_per_person * param_persons
 
@@ -242,7 +258,8 @@ class StreamlitCalculationGenerator:
                             param_liter_km,
                             param_fuel_type,
                             param_toll,
-                            param_persons
+                            param_persons,
+                            param_commission
                         )
                     else:
                         st.error("Could not calculate distance between locations")
@@ -264,7 +281,8 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> None:
         ''' Display successful calculation results '''
 
@@ -284,7 +302,8 @@ class StreamlitCalculationGenerator:
         self._display_cost_breakdown(
             param_result,
             param_toll,
-            param_persons
+            param_persons,
+            param_commission
         )
 
         return None
@@ -340,11 +359,15 @@ class StreamlitCalculationGenerator:
         self,
         param_result: dict,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> None:
         ''' Display cost breakdown '''
 
-        st.subheader("Cost Breakdown")
+        if param_commission:
+            st.subheader(f"Cost Breakdown (including 15% commission)")
+        else:
+            st.subheader(f"Cost Breakdown (no commission)")
 
         cost_breakdown = {
             "Fuel Cost": param_result['total_cost'] - param_toll,
