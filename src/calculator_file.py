@@ -2,6 +2,7 @@
 
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
+from src.tolls_file import Tolls
 
 class RouteCalculator:
     ''' A class to calculate routes based on map data. '''
@@ -11,6 +12,7 @@ class RouteCalculator:
 
         self.geocoder = Geocoders()
         self.gasoline = Gasoline()
+        self.tolls = Tolls()
 
     # -----
 

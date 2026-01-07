@@ -181,7 +181,8 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+
     ) -> None:
         ''' Calculate route and display results using closest gas station price or selected station '''
 
@@ -213,6 +214,29 @@ class StreamlitCalculationGenerator:
                         'end': param_end_location
                     }
                     distance = geocoders.geocode_distance_method(locations)
+                    route = RouteCalculator()
+                    start_coords = geocoders.geocode_coordinates_method(param_start_location)
+                    end_coords = geocoders.geocode_coordinates_method(param_end_location)
+                    # Nombre de péages détectés
+                    has_toll = False
+                    detected_toll = 0.0
+                    toll_count = 0
+                    if start_coords and end_coords:
+                        has_toll = route.tolls.has_toll_on_route(
+                        start=start_coords,
+                        end=end_coords
+                     )
+                    toll_count = route.tolls.count_tolls_on_route(
+                    start=start_coords,
+                    end=end_coords
+                    )
+                    detected_toll = 15.0 if has_toll else 0.0
+
+
+                        
+    
+
+
 
                     if distance is not None:
                         route = RouteCalculator()
@@ -220,7 +244,7 @@ class StreamlitCalculationGenerator:
                             distance,
                             param_liter_km,
                             closest_fuel_price,
-                            param_toll,
+                            detected_toll,
                             param_persons
                         )
                         total_cost = cost_per_person * param_persons
@@ -232,7 +256,10 @@ class StreamlitCalculationGenerator:
                             'total_cost': round(total_cost, 2),
                             'distance': distance,
                             'fuel_price': closest_fuel_price,
-                            'closest_station': closest_station
+                            'closest_station': closest_station,
+                            'has_toll': has_toll,
+                            'toll_count': toll_count,
+                            'detected_toll': detected_toll,
                         }
 
                         self._display_success_results(
@@ -279,7 +306,10 @@ class StreamlitCalculationGenerator:
             param_liter_km,
             param_fuel_type,
             param_toll,
-            param_persons
+            param_persons,
+            param_result["has_toll"],
+            param_result["toll_count"],
+            param_result["detected_toll"],
         )
         self._display_cost_breakdown(
             param_result,
@@ -315,7 +345,10 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_has_toll: bool,
+        param_toll_count: int,
+        param_detected_toll: float
     ) -> None:
         ''' Display data summary '''
 
@@ -329,7 +362,13 @@ class StreamlitCalculationGenerator:
 
         with data_summary_col2:
             st.write(f"**Fuel Consumption:** {param_liter_km} L/100km")
-            st.write(f"**Toll:** {param_toll:.2f}€")
+            st.write(f"**Toll:** {param_detected_toll:.2f}€")
+            if param_has_toll:
+                st.write("**Toll detected:**  Yes")
+                st.write(f"**Toll count:** {param_toll_count}")
+            else:
+                st.write("**Toll detected:**  No")
+                st.write("**Toll count:** 0")
             st.write(f"**Persons:** {param_persons}")
 
         return None
