@@ -4,40 +4,54 @@ import pandas as pd
 HUBS = ["Paris", "Lyon", "Marseille", "Lille", "Bordeaux"]
 
 MIN_DIST_KM = 120
-MAX_DIST_KM = 500
-NUMBER_OF_TRAJECT_BY_CITY = 7
+MAX_DIST_KM = 900
+PER_REGION = 2
+MAX_REGIONS_PER_CITY = None
 
 cities = pd.read_csv("./data/csv/cities.csv")
 routes = set()
+city_set = set(cities["city"])
+all_regions = sorted(cities["region"].unique().tolist())
 
 for _, row in cities.iterrows():
-    city = row["city"]
+    origin_city = row["city"]
+    origin_region = row["region"]
     origin_lat_lon = (row["lat"], row["lon"])
 
-    distances = []
-    for _, other_row in cities.iterrows():
-        if city == other_row["city"]:
+    for hub in HUBS:
+        if hub != origin_city and hub in city_set:
+            routes.add((origin_city, hub))
+
+    regions_added = 0
+    for region in all_regions:
+        if region == origin_region:
             continue
 
-        destination_city = other_row["city"]
-        destination_lat_lon = (other_row["lat"], other_row["lon"])
+        candidates_dataframe = cities[cities["region"] == region]
 
-        distance = haversine.haversine(origin_lat_lon, destination_lat_lon)
-        distances.append((destination_city, distance))
+        distances = []
+        for _, other_row in candidates_dataframe.iterrows():
+            destination_city = other_row["city"]
+            if destination_city == origin_city:
+                continue
 
-    for hub in HUBS:
-        if hub != city:
-            routes.add((city, hub))
+            destination_lat_lon = (other_row["lat"], other_row["lon"])
+            distance = haversine.haversine(origin_lat_lon, destination_lat_lon)
 
-    candidates = []
-    for destination, distance in distances:
-        if MIN_DIST_KM <= distance <= MAX_DIST_KM:
-            candidates.append((destination, distance))
+            if MIN_DIST_KM <= distance <= MAX_DIST_KM:
+                distances.append((destination_city, distance))
 
-    candidates.sort(key=lambda x: x[1])
+        if not distances:
+            continue
 
-    for destination, distance in candidates[:NUMBER_OF_TRAJECT_BY_CITY]:
-        routes.add((city, destination))
+        distances.sort(key=lambda x: x[1])
 
-df_routes = pd.DataFrame(list(routes), columns=["from_city", "to_city"])
+        for destination_city, distance in distances[:PER_REGION]:
+            routes.add((origin_city, destination_city))
+
+        regions_added += 1
+        if MAX_REGIONS_PER_CITY is not None and regions_added >= MAX_REGIONS_PER_CITY:
+            break
+
+df_routes = pd.DataFrame(sorted(list(routes)), columns=["from_city", "to_city"])
 df_routes.to_csv("./data/csv/routes_to_scrape.csv", index=False)
