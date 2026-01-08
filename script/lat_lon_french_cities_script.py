@@ -171,4 +171,4 @@ for city in cities:
     print(f"City: {city}, Latitude: {lat}, Longitude: {lon}")
 
 df = pd.DataFrame(rows, columns=["city", "lat", "lon"])
-df.to_csv("cities.csv", index=False)
+df.to_csv("./data/csv/cities.csv", index=False)
