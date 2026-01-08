@@ -65,7 +65,7 @@ class StreamlitCalculationGenerator:
 
     def _get_all_french_cities_from_api(self) -> list[str]:
         ''' Get ALL French cities from government API (36,000+ communes) '''
-        
+
         try:
             # Cache pour éviter de refaire l'appel à chaque fois
             if 'french_cities_cache' not in st.session_state:
@@ -104,7 +104,7 @@ class StreamlitCalculationGenerator:
         st.sidebar.header("Route Parameters")
 
         all_french_cities = self._get_all_french_cities_from_api()
-        
+
         if not all_french_cities:
             st.sidebar.error("Impossible de charger les villes. Vérifiez votre connexion internet.")
             return "", ""
@@ -131,7 +131,7 @@ class StreamlitCalculationGenerator:
 
         with end_col:
             end_location = st.selectbox(
-                "Ville d'arrivée", 
+                "Ville d'arrivée",
                 options=[""] + all_french_cities,
                 index=0,
                 placeholder="Tapez pour rechercher une ville...",
