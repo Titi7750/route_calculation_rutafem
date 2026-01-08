@@ -1,5 +1,7 @@
-''' Script to get latitude and longitude of French cities and save them to a CSV file.'''
+''' Script to get latitude, longitude and region of French cities and save them to a CSV file. '''
 
+import time
+import requests
 import pandas as pd
 from src.geocoders_file import Geocoders
 
@@ -160,15 +162,48 @@ cities = [
     "Flers"
 ]
 
+def get_region_from_latlon(param_latitude: float, param_longitude: float) -> str | None:
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {
+        "format": "json",
+        "lat": param_latitude,
+        "lon": param_longitude,
+        "zoom": 10,
+        "addressdetails": 1,
+        "accept-language": "fr",
+    }
+    request = requests.get(
+        url,
+        params=params,
+        headers={
+            "User-Agent": "school-project-peages"
+        }
+    )
+    request.raise_for_status()
+    data = request.json()
+    address = data.get("address", {})
+
+    return address.get("state") or address.get("region")
+
 rows = []
 geocoder = Geocoders()
 for city in cities:
-    coords = geocoder._geocode_longitude_latitude_method(city)
-    lat = coords['latitude']
-    lon = coords['longitude']
-    rows.append([city, lat, lon])
+    query = f"{city}, France"
+    coords = geocoder._geocode_longitude_latitude_method(query)
 
-    print(f"City: {city}, Latitude: {lat}, Longitude: {lon}")
+    lat = coords["latitude"]
+    lon = coords["longitude"]
 
-df = pd.DataFrame(rows, columns=["city", "lat", "lon"])
-df.to_csv("./data/csv/cities.csv", index=False)
+    region = None
+    try:
+        region = get_region_from_latlon(lat, lon)
+    except Exception as e:
+        print(f"Region not found for {city}: {e}")
+
+    rows.append([city, lat, lon, region])
+
+    time.sleep(1.0)
+
+dataframe = pd.DataFrame(rows, columns=["city", "lat", "lon", "region"])
+dataframe = dataframe.dropna(subset=["region"]).copy()
+dataframe.to_csv("./data/csv/cities_with_regions.csv", index=False)
