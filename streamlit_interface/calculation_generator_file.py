@@ -181,8 +181,7 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int,
-
+        param_persons: int
     ) -> None:
         ''' Calculate route and display results using closest gas station price or selected station '''
 
