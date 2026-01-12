@@ -1,5 +1,6 @@
 ''' A Streamlit interface for route calculation '''
 
+import requests
 import streamlit as st
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
@@ -15,13 +16,14 @@ class StreamlitCalculationGenerator:
         self._display_title()
 
         # Get user inputs
+        commission = self._get_commission_input()
         start_location, end_location = self._get_location_inputs()
         liter_km, fuel_type = self._get_fuel_inputs()
         toll, persons = self._get_toll_and_persons_inputs()
 
         if st.sidebar.button("Calculate Route", use_container_width=True):
             self._calculate_and_display_route(
-                start_location, end_location, liter_km, fuel_type, toll, persons
+                start_location, end_location, liter_km, fuel_type, toll, persons, commission
             )
 
         return None
@@ -48,26 +50,106 @@ class StreamlitCalculationGenerator:
 
     # -----
 
+    def _get_commission_input(self) -> bool:
+        ''' Get commission inclusion input '''
+
+        st.sidebar.subheader("Commission")
+        commission = st.sidebar.checkbox(
+            "Include 15% commission",
+            value=True
+        )
+
+        return commission
+
+    # -----
+
+    def _get_all_french_cities_from_api(self) -> list[str]:
+        ''' Get ALL French cities from government API (36,000+ communes) '''
+        
+        try:
+            # Cache pour éviter de refaire l'appel à chaque fois
+            if 'french_cities_cache' not in st.session_state:
+                with st.spinner("Chargement de toutes les communes françaises..."):
+                    response = requests.get(
+                        "https://geo.api.gouv.fr/communes?fields=nom,population&format=json",
+                        timeout=15
+                    )
+
+                    if response.status_code == 200:
+                        communes = response.json()
+
+                        cities = []
+                        for commune in communes:
+                            if commune.get('population', 0) > 500:
+                                cities.append(commune['nom'])
+
+                        clean_cities = sorted(set(cities))
+                        st.session_state.french_cities_cache = clean_cities
+
+                    else:
+                        st.error("Erreur lors du chargement des communes françaises")
+                        st.session_state.french_cities_cache = []
+
+            return st.session_state.french_cities_cache
+
+        except Exception as e:
+            st.error(f"Erreur de connexion à l'API: {e}")
+            return []
+
+    # -----
+
     def _get_location_inputs(self) -> tuple[str, str]:
-        ''' Get start and end location inputs '''
+        ''' Get start and end location inputs with all french cities from API '''
 
         st.sidebar.header("Route Parameters")
 
+        all_french_cities = self._get_all_french_cities_from_api()
+        
+        if not all_french_cities:
+            st.sidebar.error("Impossible de charger les villes. Vérifiez votre connexion internet.")
+            return "", ""
+
         start_col, end_col = st.columns(2)
         with start_col:
-            start_location = st.text_input(
-                "Start Location",
-                placeholder="Paris"
+            start_location = st.selectbox(
+                "Ville de départ",
+                options=[""] + all_french_cities,
+                index=0,
+                placeholder="Tapez pour rechercher une ville...",
+                help=f"Recherchez parmi {len(all_french_cities):,} communes françaises"
             )
+
+            if start_location == "":
+                start_custom = st.text_input(
+                    "Ou saisissez une adresse complète:",
+                    placeholder="15 Rue de Rivoli, Paris, France",
+                    key="start_custom",
+                    help="Adresse précise, code postal, région..."
+                )
+                if start_custom:
+                    start_location = start_custom
 
         with end_col:
-            end_location = st.text_input(
-                "End Location",
-                placeholder="Lyon"
+            end_location = st.selectbox(
+                "Ville d'arrivée", 
+                options=[""] + all_french_cities,
+                index=0,
+                placeholder="Tapez pour rechercher une ville...",
+                help=f"Recherchez parmi {len(all_french_cities):,} communes françaises"
             )
 
-        if start_location:
-            with st.expander("Find Nearby Gas Stations"):
+            if end_location == "":
+                end_custom = st.text_input(
+                    "Ou saisissez une adresse complète:",
+                    placeholder="Place Bellecour, Lyon, France",
+                    key="end_custom",
+                    help="Adresse précise, code postal, région..."
+                )
+                if end_custom:
+                    end_location = end_custom
+
+        if start_location and start_location != "":
+            with st.expander("Trouver des stations-service proches"):
                 self._display_nearby_gas_stations(start_location)
 
         return start_location, end_location
@@ -181,7 +263,8 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> None:
         ''' Calculate route and display results using closest gas station price or selected station '''
 
@@ -213,29 +296,6 @@ class StreamlitCalculationGenerator:
                         'end': param_end_location
                     }
                     distance = geocoders.geocode_distance_method(locations)
-                    route = RouteCalculator()
-                    start_coords = geocoders.geocode_coordinates_method(param_start_location)
-                    end_coords = geocoders.geocode_coordinates_method(param_end_location)
-                    # Nombre de péages détectés
-                    has_toll = False
-                    detected_toll = 0.0
-                    toll_count = 0
-                    if start_coords and end_coords:
-                        has_toll = route.tolls.has_toll_on_route(
-                        start=start_coords,
-                        end=end_coords
-                     )
-                    toll_count = route.tolls.count_tolls_on_route(
-                    start=start_coords,
-                    end=end_coords
-                    )
-                    detected_toll = 15.0 if has_toll else 0.0
-
-
-                        
-    
-
-
 
                     if distance is not None:
                         route = RouteCalculator()
@@ -243,8 +303,9 @@ class StreamlitCalculationGenerator:
                             distance,
                             param_liter_km,
                             closest_fuel_price,
-                            detected_toll,
-                            param_persons
+                            param_toll,
+                            param_persons,
+                            param_commission=param_commission
                         )
                         total_cost = cost_per_person * param_persons
 
@@ -255,10 +316,7 @@ class StreamlitCalculationGenerator:
                             'total_cost': round(total_cost, 2),
                             'distance': distance,
                             'fuel_price': closest_fuel_price,
-                            'closest_station': closest_station,
-                            'has_toll': has_toll,
-                            'toll_count': toll_count,
-                            'detected_toll': detected_toll,
+                            'closest_station': closest_station
                         }
 
                         self._display_success_results(
@@ -268,7 +326,8 @@ class StreamlitCalculationGenerator:
                             param_liter_km,
                             param_fuel_type,
                             param_toll,
-                            param_persons
+                            param_persons,
+                            param_commission
                         )
                     else:
                         st.error("Could not calculate distance between locations")
@@ -290,7 +349,8 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> None:
         ''' Display successful calculation results '''
 
@@ -305,15 +365,13 @@ class StreamlitCalculationGenerator:
             param_liter_km,
             param_fuel_type,
             param_toll,
-            param_persons,
-            param_result["has_toll"],
-            param_result["toll_count"],
-            param_result["detected_toll"],
+            param_persons
         )
         self._display_cost_breakdown(
             param_result,
             param_toll,
-            param_persons
+            param_persons,
+            param_commission
         )
 
         return None
@@ -344,10 +402,7 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int,
-        param_has_toll: bool,
-        param_toll_count: int,
-        param_detected_toll: float
+        param_persons: int
     ) -> None:
         ''' Display data summary '''
 
@@ -361,13 +416,7 @@ class StreamlitCalculationGenerator:
 
         with data_summary_col2:
             st.write(f"**Fuel Consumption:** {param_liter_km} L/100km")
-            st.write(f"**Toll:** {param_detected_toll:.2f}€")
-            if param_has_toll:
-                st.write("**Toll detected:**  Yes")
-                st.write(f"**Toll count:** {param_toll_count}")
-            else:
-                st.write("**Toll detected:**  No")
-                st.write("**Toll count:** 0")
+            st.write(f"**Toll:** {param_toll:.2f}€")
             st.write(f"**Persons:** {param_persons}")
 
         return None
@@ -378,11 +427,15 @@ class StreamlitCalculationGenerator:
         self,
         param_result: dict,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> None:
         ''' Display cost breakdown '''
 
-        st.subheader("Cost Breakdown")
+        if param_commission:
+            st.subheader(f"Cost Breakdown (including 15% commission)")
+        else:
+            st.subheader(f"Cost Breakdown (no commission)")
 
         cost_breakdown = {
             "Fuel Cost": param_result['total_cost'] - param_toll,

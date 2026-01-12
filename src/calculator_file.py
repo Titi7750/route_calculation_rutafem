@@ -22,7 +22,8 @@ class RouteCalculator:
         param_liter_km: float,
         param_fuel_price: float,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_commission: bool
     ) -> float:
         ''' Calculate the total cost based on provided parameters '''
 
@@ -41,7 +42,13 @@ class RouteCalculator:
         gasoline_price = liters_used * param_fuel_price
         total_cost = gasoline_price + param_toll
 
-        total_cost_divided = total_cost / param_persons
+        if param_commission:
+            commission_amount = total_cost * 0.15
+            final_cost = total_cost + commission_amount
+        else:
+            final_cost = total_cost
+
+        total_cost_divided = final_cost / param_persons
 
         return round(total_cost_divided, 2)
 
