@@ -141,3 +141,17 @@ class Geocoders:
 
         gas_stations.sort(key=lambda x: x['distance_km'])
         return gas_stations[:param_max_results]
+    
+    def geocode_coordinates_method(
+        self,
+        param_location: str
+    ) -> tuple[float, float] | None:
+        """Return (latitude, longitude) for a given address"""
+
+        coords = self._geocode_longitude_latitude_method(param_location)
+
+        if coords['latitude'] is not None and coords['longitude'] is not None:
+            return (coords['latitude'], coords['longitude'])
+
+        return None
+
