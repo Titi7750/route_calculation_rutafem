@@ -12,6 +12,7 @@ cities = pd.read_csv("./data/csv/cities.csv")
 routes = set()
 city_set = set(cities["city"])
 all_regions = sorted(cities["region"].unique().tolist())
+city_to_region = dict(zip(cities["city"], cities["region"])) # Map city to its region
 
 for _, row in cities.iterrows():
     origin_city = row["city"]
@@ -20,7 +21,9 @@ for _, row in cities.iterrows():
 
     for hub in HUBS:
         if hub != origin_city and hub in city_set:
-            routes.add((origin_city, hub))
+            destination_region = city_to_region.get(hub)
+            if destination_region:
+                routes.add((origin_city, origin_region, hub, destination_region))
 
     regions_added = 0
     for region in all_regions:
@@ -47,11 +50,15 @@ for _, row in cities.iterrows():
         distances.sort(key=lambda x: x[1])
 
         for destination_city, distance in distances[:PER_REGION]:
-            routes.add((origin_city, destination_city))
+            destination_region = city_to_region.get(destination_city)
+            if destination_region:
+                routes.add((origin_city, origin_region, destination_city, destination_region))
 
         regions_added += 1
         if MAX_REGIONS_PER_CITY is not None and regions_added >= MAX_REGIONS_PER_CITY:
             break
 
-df_routes = pd.DataFrame(sorted(list(routes)), columns=["from_city", "to_city"])
+df_routes = pd.DataFrame(
+    sorted(list(routes)), columns=["from_city", "from_region", "to_city", "to_region"]
+)
 df_routes.to_csv("./data/csv/routes_to_scrape.csv", index=False)
