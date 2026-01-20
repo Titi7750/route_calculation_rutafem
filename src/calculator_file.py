@@ -3,6 +3,7 @@
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
 from src.tolls_file import Tolls
+from src.routing_file import get_route_osrm
 
 class RouteCalculator:
     ''' A class to calculate routes based on map data. '''
@@ -51,8 +52,14 @@ class RouteCalculator:
         total_cost_divided = final_cost / param_persons
 
         return round(total_cost_divided, 2)
+    def get_toll_info(self, start_coords: tuple, end_coords: tuple) -> dict:
+        osrm_data = get_route_osrm(
+            origin=start_coords,
+            destination=end_coords
+        )
 
-    # -----
+        return self.tolls.get_toll_details(osrm_data)
+
 
     # def get_route_data_method(
     #     self,
