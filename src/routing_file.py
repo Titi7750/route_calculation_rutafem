@@ -29,15 +29,19 @@ def geocode_address(address: str) -> Tuple[float, float]:
 
 def get_route_osrm(
     origin: Tuple[float, float],
-    destination: Tuple[float, float]
+    destination: Tuple[float, float],
+    alternatives: bool = False,
+    steps: bool = True,
+    overview: bool | str = "false",
 ) -> Dict:
     lat1, lon1 = origin
     lat2, lon2 = destination
 
     url = f"{OSRM_ROUTE_URL}/{lon1},{lat1};{lon2},{lat2}"
     params = {
-        "steps": "true",
-        "overview": "false"
+        "steps": "true" if steps else "false",
+        "overview": "false",
+        "alternatives": "true" if alternatives else "false",
     }
 
     response = requests.get(url, params=params)

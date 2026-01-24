@@ -5,6 +5,7 @@ import streamlit as st
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
 from src.calculator_file import RouteCalculator
+from src.routing_file import get_route_osrm
 
 class StreamlitCalculationGenerator:
     ''' A Streamlit interface for route calculation. '''
@@ -296,6 +297,27 @@ class StreamlitCalculationGenerator:
                         'end': param_end_location
                     }
                     distance = geocoders.geocode_distance_method(locations)
+                    route = RouteCalculator()
+                    start_coords = geocoders.geocode_coordinates_method(param_start_location)
+                    end_coords = geocoders.geocode_coordinates_method(param_end_location)
+                    # Nombre de péages détectés
+                    has_toll = False
+                    detected_toll = 0.0
+                    toll_count = 0
+                    if start_coords and end_coords:
+                        osrm_data = get_route_osrm(
+                            origin=start_coords,
+                            destination=end_coords
+                        )
+                        has_toll = route.tolls.has_toll_on_route(osrm_data)
+                        toll_count = route.tolls.count_tolls_on_route(osrm_data)
+                        detected_toll = route.tolls.get_toll_cost(osrm_data)
+
+
+                        
+    
+
+
 
                     if distance is not None:
                         route = RouteCalculator()
@@ -303,9 +325,9 @@ class StreamlitCalculationGenerator:
                             distance,
                             param_liter_km,
                             closest_fuel_price,
-                            param_toll,
+                            detected_toll,
                             param_persons,
-                            param_commission=param_commission
+                            param_commission
                         )
                         total_cost = cost_per_person * param_persons
 
@@ -316,7 +338,10 @@ class StreamlitCalculationGenerator:
                             'total_cost': round(total_cost, 2),
                             'distance': distance,
                             'fuel_price': closest_fuel_price,
-                            'closest_station': closest_station
+                            'closest_station': closest_station,
+                            'has_toll': has_toll,
+                            'toll_count': toll_count,
+                            'detected_toll': detected_toll,
                         }
 
                         self._display_success_results(
@@ -365,11 +390,13 @@ class StreamlitCalculationGenerator:
             param_liter_km,
             param_fuel_type,
             param_toll,
-            param_persons
+            param_persons,
+            param_result["has_toll"],
+            param_result["toll_count"],
+            param_result["detected_toll"],
         )
         self._display_cost_breakdown(
             param_result,
-            param_toll,
             param_persons,
             param_commission
         )
@@ -402,7 +429,10 @@ class StreamlitCalculationGenerator:
         param_liter_km: float,
         param_fuel_type: str,
         param_toll: float,
-        param_persons: int
+        param_persons: int,
+        param_has_toll: bool,
+        param_toll_count: int,
+        param_detected_toll: float
     ) -> None:
         ''' Display data summary '''
 
@@ -416,7 +446,13 @@ class StreamlitCalculationGenerator:
 
         with data_summary_col2:
             st.write(f"**Fuel Consumption:** {param_liter_km} L/100km")
-            st.write(f"**Toll:** {param_toll:.2f}€")
+            st.write(f"**Toll:** {param_detected_toll:.2f}€")
+            if param_has_toll:
+                st.write("**Toll detected:**  Yes")
+                st.write(f"**Toll count:** {param_toll_count}")
+            else:
+                st.write("**Toll detected:**  No")
+                st.write("**Toll count:** 0")
             st.write(f"**Persons:** {param_persons}")
 
         return None
@@ -426,7 +462,6 @@ class StreamlitCalculationGenerator:
     def _display_cost_breakdown(
         self,
         param_result: dict,
-        param_toll: float,
         param_persons: int,
         param_commission: bool
     ) -> None:
@@ -438,8 +473,8 @@ class StreamlitCalculationGenerator:
             st.subheader(f"Cost Breakdown (no commission)")
 
         cost_breakdown = {
-            "Fuel Cost": param_result['total_cost'] - param_toll,
-            "Toll": param_toll,
+            "Fuel Cost": param_result['total_cost'] - param_result['detected_toll'],
+            "Toll": param_result['detected_toll'],
             "Total": param_result['total_cost']
         }
 
