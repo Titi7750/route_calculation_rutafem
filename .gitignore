@@ -6,3 +6,6 @@ __pycache__/
 
 # Data files
 data/parquet/
+
+# PyCharm folder
+.idea/

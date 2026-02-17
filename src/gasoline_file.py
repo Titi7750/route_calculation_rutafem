@@ -39,9 +39,19 @@ class Gasoline:
         try:
             if not os.path.isfile(file_path):
                 print("Downloading parquet file from API...")
-                subprocess.run([
-                    "curl", "-o", file_path, self.curl_parquet
-                ], check=True, capture_output=True, text=True)
+
+                subprocess.run(
+                    [
+                        "curl",
+                        "-o",
+                        file_path,
+                        self.curl_parquet
+                    ],
+                    check=True, # Check for errors during download
+                    capture_output=True, # Capture output errors
+                    text=True # Output text for error messages
+                )
+
                 print("Download completed successfully.")
 
             if os.path.isfile(file_path):
@@ -52,9 +62,18 @@ class Gasoline:
                 os.remove(file_path)
 
                 print("Updating parquet file...")
-                subprocess.run([
-                    "curl", "-o", file_path, self.curl_parquet
-                ], check=True, capture_output=True, text=True)
+
+                subprocess.run(
+                    [
+                        "curl",
+                        "-o",
+                        file_path,
+                        self.curl_parquet
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
                 print("Update completed successfully.")
 
         except subprocess.CalledProcessError as e:
@@ -115,13 +134,13 @@ class Gasoline:
                     'longitude': longitude
                 }
 
-            if isinstance(row['prix'], str):
+            if isinstance(row['prix'], str): # prix = "[{}]"
                 try:
                     prix_list = json.loads(row['prix']) # Convert string to list of dictionaries
                 except:
                     prix_list = []
             else:
-                prix_list = row['prix'] if isinstance(row['prix'], list) else []
+                prix_list = row['prix'] if isinstance(row['prix'], list) else [] # prix = [{}] or prix = None
 
             price_key = 'prix'
             if price_key not in dictionary_fuel[fuel_key][row['adresse']]:

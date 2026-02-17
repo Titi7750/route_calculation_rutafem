@@ -3,7 +3,7 @@
 import time
 import requests
 import pandas as pd
-from src.geocoders_file import Geocoders
+from src.geocoders_file import Geocoder
 
 cities = [
     "Paris",
@@ -186,7 +186,7 @@ def get_region_from_latlon(param_latitude: float, param_longitude: float) -> str
     return address.get("state") or address.get("region")
 
 rows = []
-geocoder = Geocoders()
+geocoder = Geocoder()
 for city in cities:
     query = f"{city}, France"
     coords = geocoder._geocode_longitude_latitude_method(query)

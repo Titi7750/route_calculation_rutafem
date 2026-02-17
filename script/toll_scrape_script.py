@@ -17,8 +17,6 @@ dataframe = pd.read_csv(
     )
 )
 
-print(dataframe)
-
 driver = webdriver.Chrome()
 driver.get("https://www.viamichelin.fr/itineraires")
 driver.implicitly_wait(0.5)

@@ -6,7 +6,7 @@ from haversine import haversine, Unit
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
 
-class Geocoders:
+class Geocoder:
     ''' Class to handle geocoding operations '''
 
     def __init__(self, user_agent: str = "rutafem_geocoder"):
@@ -71,7 +71,7 @@ class Geocoders:
         url_params = {
             'overview': 'false',
             'alternatives': 'false',
-            'steps': 'false'
+            'steps': 'true' # to get detailed route information, including distance
         }
 
         try:

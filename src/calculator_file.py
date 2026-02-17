@@ -1,7 +1,7 @@
 ''' A module to calculate routes using geocoding and fuel data '''
 
 from src.gasoline_file import Gasoline
-from src.geocoders_file import Geocoders
+from src.geocoders_file import Geocoder
 
 class RouteCalculator:
     ''' A class to calculate routes based on map data. '''
@@ -9,7 +9,7 @@ class RouteCalculator:
     def __init__(self):
         ''' Initialize the RouteCalculator class '''
 
-        self.geocoder = Geocoders()
+        self.geocoder = Geocoder()
         self.gasoline = Gasoline()
 
     # -----

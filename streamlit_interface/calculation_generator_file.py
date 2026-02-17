@@ -3,7 +3,7 @@
 import requests
 import streamlit as st
 from src.gasoline_file import Gasoline
-from src.geocoders_file import Geocoders
+from src.geocoders_file import Geocoder
 from src.calculator_file import RouteCalculator
 
 class StreamlitCalculationGenerator:
@@ -170,7 +170,7 @@ class StreamlitCalculationGenerator:
 
             with st.spinner("Finding nearby gas stations..."):
                 gasoline = Gasoline()
-                geocoders = Geocoders()
+                geocoders = Geocoder()
 
                 fuel_data = gasoline.get_data_fuel_method()
 
@@ -271,7 +271,7 @@ class StreamlitCalculationGenerator:
         with st.spinner("Calculating route..."):
             try:
                 gasoline = Gasoline()
-                geocoders = Geocoders()
+                geocoders = Geocoder()
 
                 fuel_data = gasoline.get_data_fuel_method()
                 closest_stations = geocoders.find_closest_gas_stations_method(
