@@ -1,19 +1,40 @@
 ''' A module to calculate routes using geocoding and fuel data '''
 
+from typing import List, Tuple
+from src.tolls_file import Tolls
+from dataclasses import dataclass
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
-from src.tolls_file import Tolls
 from src.routing_file import get_route_osrm
+
+# -----
+
+@dataclass
+class RouteOption:
+    ''' Represents a single route option with its costs '''
+
+    index: int
+    distance_km: float
+    duration_min: float
+    fuel_cost: float
+    toll_cost: float
+    total_cost: float
+    cost_per_person: float
+    tags: List[str]
+
+# -----
 
 class RouteCalculator:
     ''' A class to calculate routes based on map data. '''
 
+    COMMISSION_RATE = 0.15
+
     def __init__(self):
         ''' Initialize the RouteCalculator class '''
 
-        self.geocoder = Geocoders()
-        self.gasoline = Gasoline()
         self.tolls = Tolls()
+        self.gasoline = Gasoline()
+        self.geocoder = Geocoders()
 
     # -----
 
@@ -44,99 +65,101 @@ class RouteCalculator:
         total_cost = gasoline_price + param_toll
 
         if param_commission:
-            commission_amount = total_cost * 0.15
+            commission_amount = total_cost * self.COMMISSION_RATE
             final_cost = total_cost + commission_amount
         else:
             final_cost = total_cost
 
-        total_cost_divided = final_cost / param_persons
+        cost_per_person = round(final_cost / param_persons, 2)
 
-        return round(total_cost_divided, 2)
-    def get_toll_info(self, start_coords: tuple, end_coords: tuple) -> dict:
+        return cost_per_person
+
+    # -----
+
+    def get_toll_info(self, param_start_coords: tuple, param_end_coords: tuple) -> dict:
+        ''' Get toll information for a route between two coordinates '''
+
         osrm_data = get_route_osrm(
-            origin=start_coords,
-            destination=end_coords
+            origin=param_start_coords,
+            destination=param_end_coords
         )
 
         return self.tolls.get_toll_details(osrm_data)
 
+    # -----
 
-    # def get_route_data_method(
-    #     self,
-    #     param_start_location: str,
-    #     param_end_location: str,
-    #     param_liter_km: float,
-    #     param_fuel_type: str,
-    #     param_toll: float,
-    #     param_persons: int
-    # ) -> dict:
-    #     ''' Calculate route cost using geocoding and real fuel prices '''
+    def get_alternative_routes(
+        self,
+        param_start_coords: Tuple[float, float],
+        param_end_coords: Tuple[float, float],
+        param_liter_per_100km: float,
+        param_fuel_price_per_liter: float,
+        param_persons: int,
+        param_commission: bool,
+        param_max_alternatives: int = 2,
+    ) -> List[RouteOption]:
+        ''' Fetch up to max_alternatives+1 routes from OSRM and compute costs for each '''
 
-    #     try:
-    #         locations = {
-    #             'start': param_start_location,
-    #             'end': param_end_location
-    #         }
-    #         distance = self.geocoder.geocode_distance_method(locations)
+        osrm_data = get_route_osrm(
+            origin=param_start_coords,
+            destination=param_end_coords,
+            alternatives=True,
+            steps=True,
+        )
 
-    #         if distance is None:
-    #             return {
-    #                 'success': False,
-    #                 'error': 'Could not calculate distance between locations',
-    #                 'cost_per_person': None,
-    #                 'total_cost': None,
-    #                 'distance': None,
-    #                 'fuel_price': None
-    #             }
+        routes = osrm_data.get("routes", [])[:param_max_alternatives + 1]
+        options: List[RouteOption] = []
 
-    #         fuel_data = self.gasoline.get_data_fuel_method()
-    #         fuel_price = None
+        for idx, route in enumerate(routes, start=1):
+            distance_km = round(route["distance"] / 1000, 2)
+            duration_min = round(route["duration"] / 60, 1)
 
-    #         if fuel_price is None:
-    #             for city_data in fuel_data.values():
-    #                 for address_data in city_data.values():
-    #                     prices = address_data.get('prix', {})
-    #                     if param_fuel_type in prices:
-    #                         fuel_price = float(prices[param_fuel_type])
-    #                         break
+            toll_info = self.tolls.get_toll_details({"routes": [route]})
+            toll_cost = float(toll_info["toll_cost"])
 
-    #                 if fuel_price:
-    #                     break
+            liters = distance_km * (param_liter_per_100km / 100)
+            fuel_cost = round(liters * param_fuel_price_per_liter, 2)
 
-    #         if fuel_price is None:
-    #             return {
-    #                 'success': False,
-    #                 'error': f'Could not find fuel price for {param_fuel_type}',
-    #                 'cost_per_person': None,
-    #                 'total_cost': None,
-    #                 'distance': distance,
-    #                 'fuel_price': None
-    #             }
+            cost_per_person = self.calculate_route_method(
+                param_distance=distance_km,
+                param_liter_km=param_liter_per_100km,
+                param_fuel_price=param_fuel_price_per_liter,
+                param_toll=toll_cost,
+                param_persons=param_persons,
+                param_commission=param_commission,
+            )
+            total_cost = round(cost_per_person * param_persons, 2)
 
-    #         cost_per_person = self.calculate_route_method(
-    #             distance,
-    #             param_liter_km,
-    #             fuel_price,
-    #             param_toll,
-    #             param_persons
-    #         )
-    #         total_cost = cost_per_person * param_persons
+            options.append(RouteOption(
+                index=idx,
+                distance_km=distance_km,
+                duration_min=duration_min,
+                fuel_cost=fuel_cost,
+                toll_cost=toll_cost,
+                total_cost=total_cost,
+                cost_per_person=cost_per_person,
+                tags=[],
+            ))
 
-    #         return {
-    #             'success': True,
-    #             'error': None,
-    #             'cost_per_person': cost_per_person,
-    #             'total_cost': round(total_cost, 2),
-    #             'distance': distance,
-    #             'fuel_price': fuel_price
-    #         }
+        return self._tag_routes(options)
 
-    #     except Exception as e:
-    #         return {
-    #             'success': False,
-    #             'error': str(e),
-    #             'cost_per_person': None,
-    #             'total_cost': None,
-    #             'distance': None,
-    #             'fuel_price': None
-    #         }
+    # -----
+
+    def _tag_routes(self, param_route: List[RouteOption]) -> List[RouteOption]:
+        ''' Tag routes as cheapest, fastest, or toll-free '''
+
+        if not param_route:
+            return param_route
+
+        cheapest = min(param_route, key=lambda road: road.total_cost)
+        fastest = min(param_route, key=lambda road: road.duration_min)
+
+        for route in param_route:
+            if route is cheapest:
+                route.tags.append("le moins cher")
+            if route is fastest:
+                route.tags.append("le plus rapide")
+            if route.toll_cost == 0:
+                route.tags.append("sans péage")
+
+        return param_route

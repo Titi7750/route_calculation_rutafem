@@ -2,10 +2,12 @@
 
 import requests
 import streamlit as st
+from typing import List
+from src.tolls_file import Tolls
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
-from src.calculator_file import RouteCalculator
 from src.routing_file import get_route_osrm
+from src.calculator_file import RouteCalculator, RouteOption
 
 class StreamlitCalculationGenerator:
     ''' A Streamlit interface for route calculation. '''
@@ -20,11 +22,11 @@ class StreamlitCalculationGenerator:
         commission = self._get_commission_input()
         start_location, end_location = self._get_location_inputs()
         liter_km, fuel_type = self._get_fuel_inputs()
-        toll, persons = self._get_toll_and_persons_inputs()
+        persons = self._get_persons_inputs()
 
         if st.sidebar.button("Calculate Route", use_container_width=True):
             self._calculate_and_display_route(
-                start_location, end_location, liter_km, fuel_type, toll, persons, commission
+                start_location, end_location, liter_km, fuel_type, persons, commission
             )
 
         return None
@@ -234,16 +236,8 @@ class StreamlitCalculationGenerator:
 
     # -----
 
-    def _get_toll_and_persons_inputs(self) -> tuple[float, int]:
-        ''' Get toll cost and number of persons inputs '''
-
-        st.sidebar.subheader("Toll Cost (€)")
-        toll = st.sidebar.number_input(
-            "Toll",
-            min_value=0.0,
-            value=65.0,
-            step=1.0
-        )
+    def _get_persons_inputs(self) -> int:
+        ''' Get number of persons inputs '''
 
         st.sidebar.subheader("Number of Persons")
         persons = st.sidebar.slider(
@@ -253,7 +247,7 @@ class StreamlitCalculationGenerator:
             value=3
         )
 
-        return toll, persons
+        return persons
 
     # -----
 
@@ -263,7 +257,6 @@ class StreamlitCalculationGenerator:
         param_end_location: str,
         param_liter_km: float,
         param_fuel_type: str,
-        param_toll: float,
         param_persons: int,
         param_commission: bool
     ) -> None:
@@ -313,12 +306,6 @@ class StreamlitCalculationGenerator:
                         toll_count = route.tolls.count_tolls_on_route(osrm_data)
                         detected_toll = route.tolls.get_toll_cost(osrm_data)
 
-
-                        
-    
-
-
-
                     if distance is not None:
                         route = RouteCalculator()
                         cost_per_person = route.calculate_route_method(
@@ -350,10 +337,20 @@ class StreamlitCalculationGenerator:
                             param_end_location,
                             param_liter_km,
                             param_fuel_type,
-                            param_toll,
                             param_persons,
                             param_commission
                         )
+
+                        # Comparaison des itinéraires alternatifs
+                        if start_coords and end_coords:
+                            self._display_alternative_routes(
+                                start_coords,
+                                end_coords,
+                                param_liter_km,
+                                closest_fuel_price,
+                                param_persons,
+                                param_commission,
+                            )
                     else:
                         st.error("Could not calculate distance between locations")
                 else:
@@ -373,7 +370,6 @@ class StreamlitCalculationGenerator:
         param_end_location: str,
         param_liter_km: float,
         param_fuel_type: str,
-        param_toll: float,
         param_persons: int,
         param_commission: bool
     ) -> None:
@@ -389,7 +385,6 @@ class StreamlitCalculationGenerator:
             param_end_location,
             param_liter_km,
             param_fuel_type,
-            param_toll,
             param_persons,
             param_result["has_toll"],
             param_result["toll_count"],
@@ -428,7 +423,6 @@ class StreamlitCalculationGenerator:
         param_end_location: str,
         param_liter_km: float,
         param_fuel_type: str,
-        param_toll: float,
         param_persons: int,
         param_has_toll: bool,
         param_toll_count: int,
@@ -490,5 +484,71 @@ class StreamlitCalculationGenerator:
                 f"{param_result['cost_per_person']:.2f}€",
                 delta=f"÷ {param_persons} persons"
             )
+
+        return None
+
+    # -----
+
+    def _display_alternative_routes(
+        self,
+        start_coords: tuple,
+        end_coords: tuple,
+        liter_km: float,
+        fuel_price: float,
+        persons: int,
+        commission: bool,
+    ) -> None:
+        ''' Fetch and display alternative routes comparison '''
+
+        try:
+            route_calculator = RouteCalculator()
+            routes: List[RouteOption] = route_calculator.get_alternative_routes(
+                param_start_coords=start_coords,
+                param_end_coords=end_coords,
+                param_liter_per_100km=liter_km,
+                param_fuel_price_per_liter=fuel_price,
+                param_persons=persons,
+                param_commission=commission,
+            )
+
+            if not routes:
+                return None
+
+            st.subheader("Itinéraires alternatifs")
+            st.caption("Comparaison des routes proposées par OSRM")
+
+            labels = [
+                f"Route {r.index}  —  {', '.join(r.tags) if r.tags else '—'}  —  {r.cost_per_person:.2f} €/pers"
+                for r in routes
+            ]
+
+            selected_idx = st.radio(
+                "Sélectionner un itinéraire",
+                range(len(routes)),
+                format_func=lambda i: labels[i]
+            )
+
+            r = routes[selected_idx]
+
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Distance", f"{r.distance_km} km")
+            with col2:
+                st.metric("Durée", f"{r.duration_min} min")
+            with col3:
+                st.metric("Péages", f"{r.toll_cost:.2f} €")
+            with col4:
+                st.metric("Par personne", f"{r.cost_per_person:.2f} €")
+
+            with st.expander("Détail des coûts de cet itinéraire"):
+                st.write(f"**Carburant :** {r.fuel_cost:.2f} €")
+                st.write(f"**Péages :** {r.toll_cost:.2f} €")
+                st.write(f"**Total :** {r.total_cost:.2f} €")
+                st.write(f"**Par personne :** {r.cost_per_person:.2f} €")
+                if r.tags:
+                    st.info(f"Tags : {', '.join(r.tags)}")
+
+        except Exception as e:
+            st.warning(f"Impossible de calculer les itinéraires alternatifs : {str(e)}")
 
         return None
