@@ -3,7 +3,6 @@
 import requests
 import streamlit as st
 from typing import List
-from src.tolls_file import Tolls
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
 from src.routing_file import get_route_osrm
@@ -68,7 +67,7 @@ class StreamlitCalculationGenerator:
 
     def _get_all_french_cities_from_api(self) -> list[str]:
         ''' Get ALL French cities from government API (36,000+ communes) '''
-        
+
         try:
             # Cache pour éviter de refaire l'appel à chaque fois
             if 'french_cities_cache' not in st.session_state:
@@ -107,7 +106,7 @@ class StreamlitCalculationGenerator:
         st.sidebar.header("Route Parameters")
 
         all_french_cities = self._get_all_french_cities_from_api()
-        
+
         if not all_french_cities:
             st.sidebar.error("Impossible de charger les villes. Vérifiez votre connexion internet.")
             return "", ""
@@ -134,7 +133,7 @@ class StreamlitCalculationGenerator:
 
         with end_col:
             end_location = st.selectbox(
-                "Ville d'arrivée", 
+                "Ville d'arrivée",
                 options=[""] + all_french_cities,
                 index=0,
                 placeholder="Tapez pour rechercher une ville...",
@@ -262,10 +261,19 @@ class StreamlitCalculationGenerator:
     ) -> None:
         ''' Calculate route and display results using closest gas station price or selected station '''
 
+        if not param_start_location or not param_end_location:
+            st.error("Please provide both start and end locations")
+            return None
+
+        if param_fuel_type == "Select":
+            st.error("Please select a fuel type")
+            return None
+
         with st.spinner("Calculating route..."):
             try:
                 gasoline = Gasoline()
                 geocoders = Geocoders()
+                route_calculator = RouteCalculator()
 
                 fuel_data = gasoline.get_data_fuel_method()
                 closest_stations = geocoders.find_closest_gas_stations_method(
@@ -284,75 +292,74 @@ class StreamlitCalculationGenerator:
 
                 if closest_fuel_price:
                     closest_fuel_price = float(closest_fuel_price)
-
-                    locations = {
-                        'start': param_start_location,
-                        'end': param_end_location
-                    }
-                    distance = geocoders.geocode_distance_method(locations)
-                    route = RouteCalculator()
                     start_coords = geocoders.geocode_coordinates_method(param_start_location)
                     end_coords = geocoders.geocode_coordinates_method(param_end_location)
+
+                    if not start_coords or not end_coords:
+                        st.error("Could not geocode one or both locations")
+                        return None
+
+                    osrm_data = get_route_osrm(
+                        origin=start_coords,
+                        destination=end_coords,
+                        steps=True,
+                        overview="false"
+                    )
+
+                    routes = osrm_data.get('routes', [])
+                    if not routes:
+                        st.error("Could not calculate route between locations")
+                        return None
+
+                    distance = round(routes[0]['distance'] / 1000, 2)
+
                     # Nombre de péages détectés
-                    has_toll = False
-                    detected_toll = 0.0
-                    toll_count = 0
-                    if start_coords and end_coords:
-                        osrm_data = get_route_osrm(
-                            origin=start_coords,
-                            destination=end_coords
-                        )
-                        has_toll = route.tolls.has_toll_on_route(osrm_data)
-                        toll_count = route.tolls.count_tolls_on_route(osrm_data)
-                        detected_toll = route.tolls.get_toll_cost(osrm_data)
+                    toll_info = route_calculator.tolls.get_toll_details(osrm_data)
+                    has_toll = toll_info['has_toll']
+                    toll_count = len(toll_info['segments'])
+                    detected_toll = float(toll_info['toll_cost'])
 
-                    if distance is not None:
-                        route = RouteCalculator()
-                        cost_per_person = route.calculate_route_method(
-                            distance,
-                            param_liter_km,
-                            closest_fuel_price,
-                            detected_toll,
-                            param_persons,
-                            param_commission
-                        )
-                        total_cost = cost_per_person * param_persons
+                    cost_per_person = route_calculator.calculate_route_method(
+                        distance,
+                        param_liter_km,
+                        closest_fuel_price,
+                        detected_toll,
+                        param_persons,
+                        param_commission
+                    )
+                    total_cost = cost_per_person * param_persons
 
-                        result = {
-                            'success': True,
-                            'error': None,
-                            'cost_per_person': cost_per_person,
-                            'total_cost': round(total_cost, 2),
-                            'distance': distance,
-                            'fuel_price': closest_fuel_price,
-                            'closest_station': closest_station,
-                            'has_toll': has_toll,
-                            'toll_count': toll_count,
-                            'detected_toll': detected_toll,
-                        }
+                    result = {
+                        'success': True,
+                        'error': None,
+                        'cost_per_person': cost_per_person,
+                        'total_cost': round(total_cost, 2),
+                        'distance': distance,
+                        'fuel_price': closest_fuel_price,
+                        'closest_station': closest_station,
+                        'has_toll': has_toll,
+                        'toll_count': toll_count,
+                        'detected_toll': detected_toll,
+                    }
 
-                        self._display_success_results(
-                            result,
-                            param_start_location,
-                            param_end_location,
-                            param_liter_km,
-                            param_fuel_type,
-                            param_persons,
-                            param_commission
-                        )
+                    self._display_success_results(
+                        result,
+                        param_start_location,
+                        param_end_location,
+                        param_liter_km,
+                        param_fuel_type,
+                        param_persons,
+                        param_commission
+                    )
 
-                        # Comparaison des itinéraires alternatifs
-                        if start_coords and end_coords:
-                            self._display_alternative_routes(
-                                start_coords,
-                                end_coords,
-                                param_liter_km,
-                                closest_fuel_price,
-                                param_persons,
-                                param_commission,
-                            )
-                    else:
-                        st.error("Could not calculate distance between locations")
+                    self._display_alternative_routes(
+                        start_coords,
+                        end_coords,
+                        param_liter_km,
+                        closest_fuel_price,
+                        param_persons,
+                        param_commission,
+                    )
                 else:
                     st.error(f"Could not find fuel price for {param_fuel_type} at selected stations")
 
@@ -376,8 +383,10 @@ class StreamlitCalculationGenerator:
         ''' Display successful calculation results '''
 
         if param_result.get('closest_station'):
-            with st.info(f"Fuel price from: **{param_result['closest_station']['address']}** ({param_result['closest_station']['distance_km']} km away)"):
-                pass
+            st.info(
+                f"Fuel price from: **{param_result['closest_station']['address']}** "
+                f"({param_result['closest_station']['distance_km']} km away)"
+            )
 
         self._display_key_metrics(param_result)
         self._display_summary(

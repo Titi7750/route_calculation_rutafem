@@ -91,19 +91,8 @@ def estimate_route_toll(osrm_data: Dict) -> Dict:
         "toll_cost": cost,
         "segments": segments
     }
+
+
 class Tolls:
-
-    def has_toll_on_route(self, osrm_data: Dict) -> bool:
-        toll_info = estimate_route_toll(osrm_data)
-        return toll_info["has_toll"]
-
-    def count_tolls_on_route(self, osrm_data: Dict) -> int:
-        toll_info = estimate_route_toll(osrm_data)
-        return len(toll_info["segments"])
-
-    def get_toll_cost(self, osrm_data: Dict) -> float:
-        toll_info = estimate_route_toll(osrm_data)
-        return toll_info["toll_cost"]
-
     def get_toll_details(self, osrm_data: Dict) -> Dict:
         return estimate_route_toll(osrm_data)

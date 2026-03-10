@@ -28,6 +28,7 @@ class RouteCalculator:
     ''' A class to calculate routes based on map data. '''
 
     COMMISSION_RATE = 0.15
+    MIN_PRICE_PER_PERSON = 1.99
 
     def __init__(self):
         ''' Initialize the RouteCalculator class '''
@@ -70,21 +71,9 @@ class RouteCalculator:
         else:
             final_cost = total_cost
 
-        cost_per_person = round(final_cost / param_persons, 2)
+        cost_per_person = max(round(final_cost / param_persons, 2), self.MIN_PRICE_PER_PERSON)
 
         return cost_per_person
-
-    # -----
-
-    def get_toll_info(self, param_start_coords: tuple, param_end_coords: tuple) -> dict:
-        ''' Get toll information for a route between two coordinates '''
-
-        osrm_data = get_route_osrm(
-            origin=param_start_coords,
-            destination=param_end_coords
-        )
-
-        return self.tolls.get_toll_details(osrm_data)
 
     # -----
 
