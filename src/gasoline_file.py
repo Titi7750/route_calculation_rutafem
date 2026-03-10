@@ -3,13 +3,19 @@
 import os
 import json
 import shutil
+import threading
 import subprocess
 import pandas as pd
+from datetime import datetime, timedelta
 
 # -----
 
 class Gasoline:
     """ Class to retrieve data from different extension files """
+
+    _parquet_initialized = False
+    _init_lock = threading.Lock()
+    REFRESH_INTERVAL_HOURS = 24
 
     def __init__(self):
         """ Constructor of the Gasoline class """
@@ -18,7 +24,12 @@ class Gasoline:
             "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/parquet"
         )
 
-        self._download_parquet_file_method()
+        # Ensure parquet sync runs once per application process startup.
+        if not Gasoline._parquet_initialized:
+            with Gasoline._init_lock:
+                if not Gasoline._parquet_initialized:
+                    self._download_parquet_file_method()
+                    Gasoline._parquet_initialized = True
 
     # -----
 
@@ -38,6 +49,17 @@ class Gasoline:
             'prix-des-carburants-en-france-flux-instantane-v2_old.parquet'
         )
 
+        def should_refresh_parquet(param_file_path: str) -> bool:
+            """ Return True when parquet is missing or older than refresh interval. """
+
+            if not os.path.isfile(param_file_path):
+                return True
+
+            modified_at = datetime.fromtimestamp(os.path.getmtime(param_file_path))
+            max_age = timedelta(hours=self.REFRESH_INTERVAL_HOURS)
+
+            return datetime.now() - modified_at >= max_age
+
         try:
             if not os.path.isfile(file_path):
                 print("Downloading parquet file from API...")
@@ -46,7 +68,7 @@ class Gasoline:
                 ], check=True, capture_output=True, text=True)
                 print("Download completed successfully.")
 
-            if os.path.isfile(file_path):
+            elif should_refresh_parquet(file_path):
                 if os.path.isfile(new_file_path):
                     os.remove(new_file_path)
 
@@ -58,6 +80,8 @@ class Gasoline:
                     "curl", "-o", file_path, self.curl_parquet
                 ], check=True, capture_output=True, text=True)
                 print("Update completed successfully.")
+            else:
+                print("Parquet file is recent (<24h), skip update.")
 
         except subprocess.CalledProcessError as e:
             print(f"Error downloading parquet file: {e.stderr if e.stderr else e}")
