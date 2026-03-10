@@ -1,4 +1,4 @@
-''' A Streamlit interface for route calculation '''
+""" A Streamlit interface for route calculation """
 
 import requests
 import streamlit as st
@@ -8,11 +8,32 @@ from src.geocoders_file import Geocoders
 from src.routing_file import get_route_osrm
 from src.calculator_file import RouteCalculator, RouteOption
 
+# -----
+
 class StreamlitCalculationGenerator:
-    ''' A Streamlit interface for route calculation. '''
+    """ A Streamlit interface for route calculation. """
+
+    def _find_closest_stations(
+        self,
+        param_start_location: str,
+        param_max_results: int,
+        param_max_distance_km: float,
+    ) -> list[dict]:
+        """ Load fuel data and return closest stations for a location """
+
+        gasoline = Gasoline()
+        geocoders = Geocoders()
+        fuel_data = gasoline.get_data_fuel_method()
+
+        return geocoders.find_closest_gas_stations_method(
+            param_start_location=param_start_location,
+            param_fuel_data=fuel_data,
+            param_max_results=param_max_results,
+            param_max_distance_km=param_max_distance_km,
+        )
 
     def streamlit_interface_method(self) -> None:
-        ''' Create the Streamlit interface for route calculation '''
+        """ Create the Streamlit interface for route calculation """
 
         self._configure_page()
         self._display_title()
@@ -33,7 +54,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _configure_page(self) -> None:
-        ''' Configure Streamlit page settings '''
+        """ Configure Streamlit page settings """
 
         st.set_page_config(
             page_title="Rutafem - Route Calculator",
@@ -41,10 +62,12 @@ class StreamlitCalculationGenerator:
             initial_sidebar_state="expanded"
         )
 
+        return None
+
     # -----
 
     def _display_title(self) -> None:
-        ''' Display page title '''
+        """ Display page title """
 
         st.title("Rutafem - Route Calculator")
 
@@ -53,7 +76,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _get_commission_input(self) -> bool:
-        ''' Get commission inclusion input '''
+        """ Get commission inclusion input """
 
         st.sidebar.subheader("Commission")
         commission = st.sidebar.checkbox(
@@ -66,7 +89,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _get_all_french_cities_from_api(self) -> list[str]:
-        ''' Get ALL French cities from government API (36,000+ communes) '''
+        """ Get ALL French cities from government API (36,000+ communes) """
 
         try:
             # Cache pour éviter de refaire l'appel à chaque fois
@@ -101,7 +124,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _get_location_inputs(self) -> tuple[str, str]:
-        ''' Get start and end location inputs with all french cities from API '''
+        """ Get start and end location inputs with all french cities from API """
 
         st.sidebar.header("Route Parameters")
 
@@ -159,7 +182,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _display_nearby_gas_stations(self, start_location: str) -> None:
-        ''' Display nearby gas stations for the start location '''
+        """ Display nearby gas stations for the start location """
 
         try:
             search_radius = st.slider(
@@ -171,14 +194,8 @@ class StreamlitCalculationGenerator:
             )
 
             with st.spinner("Finding nearby gas stations..."):
-                gasoline = Gasoline()
-                geocoders = Geocoders()
-
-                fuel_data = gasoline.get_data_fuel_method()
-
-                closest_stations = geocoders.find_closest_gas_stations_method(
+                closest_stations = self._find_closest_stations(
                     param_start_location=start_location,
-                    param_fuel_data=fuel_data,
                     param_max_results=5,
                     param_max_distance_km=search_radius
                 )
@@ -211,10 +228,12 @@ class StreamlitCalculationGenerator:
         except Exception as e:
             st.error(f"Error finding gas stations: {str(e)}")
 
+        return None
+
     # -----
 
     def _get_fuel_inputs(self) -> tuple[float, str]:
-        ''' Get fuel consumption and fuel type inputs '''
+        """ Get fuel consumption and fuel type inputs """
 
         st.sidebar.subheader("Fuel Parameters")
         liter_km = st.sidebar.slider(
@@ -236,7 +255,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _get_persons_inputs(self) -> int:
-        ''' Get number of persons inputs '''
+        """ Get number of persons inputs """
 
         st.sidebar.subheader("Number of Persons")
         persons = st.sidebar.slider(
@@ -259,7 +278,7 @@ class StreamlitCalculationGenerator:
         param_persons: int,
         param_commission: bool
     ) -> None:
-        ''' Calculate route and display results using closest gas station price or selected station '''
+        """ Calculate route and display results using closest gas station price or selected station """
 
         if not param_start_location or not param_end_location:
             st.error("Please provide both start and end locations")
@@ -271,14 +290,11 @@ class StreamlitCalculationGenerator:
 
         with st.spinner("Calculating route..."):
             try:
-                gasoline = Gasoline()
                 geocoders = Geocoders()
                 route_calculator = RouteCalculator()
 
-                fuel_data = gasoline.get_data_fuel_method()
-                closest_stations = geocoders.find_closest_gas_stations_method(
+                closest_stations = self._find_closest_stations(
                     param_start_location=param_start_location,
-                    param_fuel_data=fuel_data,
                     param_max_results=1,
                     param_max_distance_km=100.0
                 )
@@ -380,7 +396,7 @@ class StreamlitCalculationGenerator:
         param_persons: int,
         param_commission: bool
     ) -> None:
-        ''' Display successful calculation results '''
+        """ Display successful calculation results """
 
         if param_result.get('closest_station'):
             st.info(
@@ -410,7 +426,7 @@ class StreamlitCalculationGenerator:
     # -----
 
     def _display_key_metrics(self, param_result: dict) -> None:
-        ''' Display distance, fuel price, and total cost '''
+        """ Display distance, fuel price, and total cost """
 
         distance_col, fuel_col, total_col = st.columns(3)
         with distance_col:
@@ -437,7 +453,7 @@ class StreamlitCalculationGenerator:
         param_toll_count: int,
         param_detected_toll: float
     ) -> None:
-        ''' Display data summary '''
+        """ Display data summary """
 
         st.subheader("Data Summary")
 
@@ -468,7 +484,7 @@ class StreamlitCalculationGenerator:
         param_persons: int,
         param_commission: bool
     ) -> None:
-        ''' Display cost breakdown '''
+        """ Display cost breakdown """
 
         if param_commission:
             st.subheader(f"Cost Breakdown (including 15% commission)")
@@ -507,7 +523,7 @@ class StreamlitCalculationGenerator:
         persons: int,
         commission: bool,
     ) -> None:
-        ''' Fetch and display alternative routes comparison '''
+        """ Fetch and display alternative routes comparison """
 
         try:
             route_calculator = RouteCalculator()

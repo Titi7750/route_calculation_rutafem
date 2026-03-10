@@ -1,6 +1,10 @@
+""" Module to estimate toll costs based on OSRM route data """
+
 from typing import Dict, List
 
-# Autoroutes 
+# -----
+
+# Autoroutes
 TOLL_MOTORWAYS = {
     "A1","A2","A3","A4","A5","A6","A6A","A6B","A7","A8","A9",
     "A10","A11","A13","A14","A16","A19","A20","A26","A28",
@@ -25,16 +29,19 @@ TOLL_RATES = {
 
 DEFAULT_RATE = 0.11
 
+# -----
 
 def normalize_ref(ref: str) -> str:
-    """Supprime espaces : 'A 6' → 'A6'"""
+    """ Remove spaces : 'A 6' → 'A6' """
+
     return ref.replace(" ", "").upper()
 
+# -----
 
 def extract_toll_segments(osrm_data: Dict) -> List[Dict]:
-    """Détecte les segments à péage via OSRM"""
-    segments = []
+    """ Detect toll segments in OSRM route data and extract motorway references and distances """
 
+    segments = []
     for route in osrm_data.get("routes", []):
         for leg in route.get("legs", []):
             for step in leg.get("steps", []):
@@ -56,11 +63,12 @@ def extract_toll_segments(osrm_data: Dict) -> List[Dict]:
 
     return segments
 
+# -----
 
 def compute_toll_cost(segments: List[Dict]) -> float:
-    """Calcule le coût total des péages"""
-    total = 0.0
+    """ Total toll cost estimation based on segments and rates """
 
+    total = 0.0
     for seg in segments:
         motorway = seg["motorway"]
         km = seg["distance_km"]
@@ -69,11 +77,12 @@ def compute_toll_cost(segments: List[Dict]) -> float:
 
     return round(total, 2)
 
+# -----
 
 def estimate_route_toll(osrm_data: Dict) -> Dict:
-    """Pipeline final péages"""
-    segments = extract_toll_segments(osrm_data)
+    """ Final toll pipeline """
 
+    segments = extract_toll_segments(osrm_data)
     if not segments:
         return {
             "has_toll": False,
@@ -92,7 +101,12 @@ def estimate_route_toll(osrm_data: Dict) -> Dict:
         "segments": segments
     }
 
+# -----
 
 class Tolls:
+    """ Class to handle toll cost estimation based on OSRM route data """
+
     def get_toll_details(self, osrm_data: Dict) -> Dict:
+        """ Estimate toll details for a given OSRM route data """
+
         return estimate_route_toll(osrm_data)

@@ -1,14 +1,16 @@
-''' Module to handle geocoding operations '''
+""" Module to handle geocoding operations """
 
 from haversine import haversine, Unit
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
 
+# -----
+
 class Geocoders:
-    ''' Class to handle geocoding operations '''
+    """ Class to handle geocoding operations """
 
     def __init__(self, user_agent: str = "rutafem_geocoder"):
-        ''' Initialize the geocoder with a user agent '''
+        """ Initialize the geocoder with a user agent """
 
         self.geolocator = Nominatim(user_agent=user_agent)
 
@@ -18,7 +20,7 @@ class Geocoders:
         self,
         param_location: str
     ) -> tuple[float, float] | None:
-        """Return (latitude, longitude) for a given address"""
+        """ Return (latitude, longitude) for a given address """
 
         try:
             geo_location = self.geolocator.geocode(param_location, timeout=10)
@@ -44,7 +46,7 @@ class Geocoders:
         param_max_results: int = 5,
         param_max_distance_km: float = 50.0
     ) -> list:
-        ''' Find closest gas stations to the start location using pre-geocoded coordinates '''
+        """ Find closest gas stations to the start location using pre-geocoded coordinates """
 
         start_coords = self.geocode_coordinates_method(param_start_location)
 
@@ -82,4 +84,3 @@ class Geocoders:
 
         gas_stations.sort(key=lambda x: x['distance_km'])
         return gas_stations[:param_max_results]
-

@@ -1,4 +1,4 @@
-''' Module to handle gasoline data files '''
+""" Module to handle gasoline data files """
 
 import os
 import json
@@ -6,11 +6,13 @@ import shutil
 import subprocess
 import pandas as pd
 
+# -----
+
 class Gasoline:
-    ''' Class to retrieve data from different extension files '''
+    """ Class to retrieve data from different extension files """
 
     def __init__(self):
-        ''' Constructor of the Gasoline class '''
+        """ Constructor of the Gasoline class """
 
         self.curl_parquet = (
             "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/parquet"
@@ -21,7 +23,7 @@ class Gasoline:
     # -----
 
     def _download_parquet_file_method(self) -> None:
-        ''' Method to download the Parquet file '''
+        """ Method to download the Parquet file """
 
         data_dir = os.path.join(
             os.getcwd(),
@@ -73,7 +75,7 @@ class Gasoline:
     # -----
 
     def get_data_fuel_method(self) -> dict:
-        ''' Method to retrieve fuel data including latitude and longitude from parquet file '''
+        """ Method to retrieve fuel data including latitude and longitude from parquet file """
 
         data_parquet = os.path.join(
             os.getcwd(),

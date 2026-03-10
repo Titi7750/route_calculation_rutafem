@@ -1,4 +1,4 @@
-''' A module to calculate routes using geocoding and fuel data '''
+""" A module to calculate routes using geocoding and fuel data """
 
 from typing import List, Tuple
 from src.tolls_file import Tolls
@@ -11,7 +11,7 @@ from src.routing_file import get_route_osrm
 
 @dataclass
 class RouteOption:
-    ''' Represents a single route option with its costs '''
+    """ Represents a single route option with its costs """
 
     index: int
     distance_km: float
@@ -25,13 +25,13 @@ class RouteOption:
 # -----
 
 class RouteCalculator:
-    ''' A class to calculate routes based on map data. '''
+    """ A class to calculate routes based on map data. """
 
     COMMISSION_RATE = 0.15
     MIN_PRICE_PER_PERSON = 1.99
 
     def __init__(self):
-        ''' Initialize the RouteCalculator class '''
+        """ Initialize the RouteCalculator class """
 
         self.tolls = Tolls()
         self.gasoline = Gasoline()
@@ -48,7 +48,7 @@ class RouteCalculator:
         param_persons: int,
         param_commission: bool
     ) -> float:
-        ''' Calculate the total cost based on provided parameters '''
+        """ Calculate the total cost based on provided parameters """
 
         if param_distance <= 0:
             raise ValueError("Distance must be positive")
@@ -87,7 +87,7 @@ class RouteCalculator:
         param_commission: bool,
         param_max_alternatives: int = 2,
     ) -> List[RouteOption]:
-        ''' Fetch up to max_alternatives+1 routes from OSRM and compute costs for each '''
+        """ Fetch up to max_alternatives+1 routes from OSRM and compute costs for each """
 
         osrm_data = get_route_osrm(
             origin=param_start_coords,
@@ -135,7 +135,7 @@ class RouteCalculator:
     # -----
 
     def _tag_routes(self, param_route: List[RouteOption]) -> List[RouteOption]:
-        ''' Tag routes as cheapest, fastest, or toll-free '''
+        """ Tag routes as cheapest, fastest, or toll-free """
 
         if not param_route:
             return param_route
