@@ -10,6 +10,7 @@ Drop this file next to calculation_generator_file.py
 after the cost breakdown in _display_success_results.
 """
 
+import os
 import pandas as pd
 import streamlit as st
 
@@ -17,8 +18,18 @@ import streamlit as st
 # FILE PATHS  (keep next to your existing CSVs)
 # --------------------------------------------------
 
-TGV_CSV_FILE        = "data/csv/train_prices_tgv.csv"
-INTERCITES_CSV_FILE = "data/csv/train_prices_intercites.csv"
+TGV_CSV_FILE = os.path.join(
+    os.getcwd(),
+    "data",
+    "csv",
+    "train_prices_tgv.csv"
+)
+INTERCITES_CSV_FILE = os.path.join(
+    os.getcwd(),
+    "data",
+    "csv",
+    "train_prices_intercites.csv"
+)
 
 TRAIN_EMISSION_KG_PER_KM = 0.02   # kg CO2 / km / passenger (ADEME average)
 
