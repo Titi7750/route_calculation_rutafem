@@ -33,6 +33,8 @@ class StreamlitCalculationGenerator:
             param_max_distance_km=param_max_distance_km,
         )
 
+    # -----
+
     def streamlit_interface_method(self) -> None:
         """ Create the Streamlit interface for route calculation """
 
