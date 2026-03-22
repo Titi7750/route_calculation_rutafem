@@ -8,6 +8,10 @@ from src.geocoders_file import Geocoders
 from src.routing_file import get_route_osrm
 from src.calculator_file import RouteCalculator, RouteOption
 
+# ── NEW: import the eco comparison module ──────────────────────────────────────
+from src.eco_comparison import EcoComparison
+# ──────────────────────────────────────────────────────────────────────────────
+
 # -----
 
 class StreamlitCalculationGenerator:
@@ -376,6 +380,17 @@ class StreamlitCalculationGenerator:
                         param_persons,
                         param_commission,
                     )
+
+                    # ── NEW: Eco & Train Comparison ──────────────────────────
+                    EcoComparison().display_section(
+                        start_location=param_start_location,
+                        end_location=param_end_location,
+                        distance_km=distance,
+                        rutafem_price=round(total_cost, 2),
+                        persons=param_persons,
+                    )
+                    # ─────────────────────────────────────────────────────────
+
                 else:
                     st.error(f"Could not find fuel price for {param_fuel_type} at selected stations")
 
