@@ -91,14 +91,14 @@ VEHICLE_OPTIONS: list[str] = [
     f"{v['make']} — {v['model']}" for v in VEHICLE_CATALOGUE
 ]
 
+
 # --------------------------------------------------
 # TRAIN PRICE HELPERS
 # --------------------------------------------------
 
 @st.cache_data(show_spinner=False)
-def load_train_prices() -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
-    """ Load TGV and Intercités CSV datasets separately (cached) """
-
+def _load_train_prices() -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    """Load TGV and Intercités CSV datasets separately (cached)."""
     try:
         df_tgv = pd.read_csv(TGV_CSV_FILE, sep=";")
     except Exception:
@@ -109,16 +109,14 @@ def load_train_prices() -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
             df_inter = df_inter.drop(columns=["Type de place"])
     except Exception:
         df_inter = None
-
     return df_tgv, df_inter
 
-# -----
 
-def get_train_price_range(
-    param_df_tgv: pd.DataFrame | None,
-    param_df_inter: pd.DataFrame | None,
-    param_origin: str,
-    param_destination: str,
+def _get_train_price_range(
+    df_tgv: pd.DataFrame | None,
+    df_inter: pd.DataFrame | None,
+    origin: str,
+    destination: str,
 ) -> tuple[float | None, float | None, str]:
     """
     Return (floor_price, typical_price, source_label) for a route.
@@ -131,71 +129,62 @@ def get_train_price_range(
 
     A single-point formula (e.g. min + 20% of range) works for some routes
     but fails badly for others because:
-        - Flash-promo floors (10-16 €) rarely appear in practice.
-        - The spread between floor and ceiling varies wildly by route.
+      - Flash-promo floors (10-16 €) rarely appear in practice.
+      - The spread between floor and ceiling varies wildly by route.
 
     Validated against real prices (March 2026):
-        Paris→Lyon:      range 16–49 €, real cheapest = 49 € ✅ (in range)
-        Lyon→Marseille:  range 20–44 €, real cheapest = 25 € ✅ (in range)
-        Paris→Bordeaux:  range 19–51 €, real cheapest = 49 € ✅ (in range)
-        Paris→Nantes:    range 13–39 €, real cheapest = 35 € ✅ (in range)
-        Paris→Strasbourg:range 16–49 €, real cheapest = 49 € ✅ (in range)
-        Paris→Rennes:    range 20–52 €, real cheapest = 40 € ✅ (in range)
+      Paris→Lyon:      range 16–49 €, real cheapest = 49 € ✅ (in range)
+      Lyon→Marseille:  range 20–44 €, real cheapest = 25 € ✅ (in range)
+      Paris→Bordeaux:  range 19–51 €, real cheapest = 49 € ✅ (in range)
+      Paris→Nantes:    range 13–39 €, real cheapest = 35 € ✅ (in range)
+      Paris→Strasbourg:range 16–49 €, real cheapest = 49 € ✅ (in range)
+      Paris→Rennes:    range 20–52 €, real cheapest = 40 € ✅ (in range)
 
     Formula
     -------
     floor   = median(Prix minimum)   — filters out one-off flash promos
     typical = floor + 40% × (median(Prix maximum) − floor)
-        — the 40th percentile of the range, where most day-of-sale prices cluster according to the validation above
+              — the 40th percentile of the range, where most day-of-sale
+                prices cluster according to the validation above
 
     Priority: TGV Tarif Normal 2nd class → Intercités Tarif Normal → any
     """
-    origin      = param_origin.lower().strip()
-    destination = param_destination.lower().strip()
+    origin      = origin.lower().strip()
+    destination = destination.lower().strip()
 
-    def _search(param_dataframe: pd.DataFrame, param_tarif_filter: str | None, param_class_filter: int | None):
-        """ Return rows matching origin/destination + optional tariff/class filters """
-
+    def _search(df: pd.DataFrame, tariff_filter: str | None, class_filter: int | None):
         mask = (
-            param_dataframe["Gare origine"].astype(str).str.lower().str.contains(origin, na=False) &
-            param_dataframe["Gare destination"].astype(str).str.lower().str.contains(destination, na=False)
+            df["Gare origine"].astype(str).str.lower().str.contains(origin, na=False) &
+            df["Gare destination"].astype(str).str.lower().str.contains(destination, na=False)
         )
-        if param_tarif_filter:
-            mask &= param_dataframe["Profil tarifaire"].astype(str) == param_tarif_filter
-        if param_class_filter is not None:
-            mask &= param_dataframe["Classe"] == param_class_filter
+        if tariff_filter:
+            mask &= df["Profil tarifaire"].astype(str) == tariff_filter
+        if class_filter is not None:
+            mask &= df["Classe"] == class_filter
+        return df[mask]
 
-        return param_dataframe[mask]
-
-    # -----
-
-    def _compute_range(param_rows: pd.DataFrame) -> tuple[float, float]:
-        """ Compute floor and typical price from a set of matching rows """
-
-        floor   = round(param_rows["Prix minimum"].median(), 0)
-        med_max = param_rows["Prix maximum"].median()
+    def _compute_range(rows: pd.DataFrame) -> tuple[float, float]:
+        floor   = round(rows["Prix minimum"].median(), 0)
+        med_max = rows["Prix maximum"].median()
         typical = round(floor + 0.40 * (med_max - floor), 0)
-
         return floor, typical
 
-    # -----
-
     # 1 — TGV, Tarif Normal, 2nd class
-    if param_df_tgv is not None:
-        rows = _search(param_df_tgv, "Tarif Normal", 2)
+    if df_tgv is not None:
+        rows = _search(df_tgv, "Tarif Normal", 2)
         if not rows.empty:
             floor, typical = _compute_range(rows)
             return floor, typical, "TGV · 2nd class · Tarif Normal"
 
     # 2 — Intercités, Tarif Normal
-    if param_df_inter is not None:
-        rows = _search(param_df_inter, "Tarif Normal", None)
+    if df_inter is not None:
+        rows = _search(df_inter, "Tarif Normal", None)
         if not rows.empty:
             floor, typical = _compute_range(rows)
             return floor, typical, "Intercités · Tarif Normal"
 
     # 3 — Any tariff/class (last resort)
-    for df, label in [(param_df_tgv, "TGV"), (param_df_inter, "Intercités")]:
+    for df, label in [(df_tgv, "TGV"), (df_inter, "Intercités")]:
         if df is None:
             continue
         rows = _search(df, None, None)
@@ -205,36 +194,184 @@ def get_train_price_range(
 
     return None, None, ""
 
+
 # --------------------------------------------------
 # CO2 HELPERS
 # --------------------------------------------------
 
-def get_vehicle_co2_kg_km(param_vehicle_label: str) -> float:
-    """ Return CO2 in kg/km for the selected vehicle label """
-
+def _get_vehicle_co2_kg_km(vehicle_label: str) -> float:
+    """Return CO2 in kg/km for the selected vehicle label."""
     for v in VEHICLE_CATALOGUE:
         label = f"{v['make']} — {v['model']}"
-        if label == param_vehicle_label:
+        if label == vehicle_label:
             return v["co2_g_km"] / 1000.0
-
     return 0.0
 
-# -----
 
-def car_co2(param_distance_km: float, param_passengers: int, param_co2_kg_km: float) -> tuple[float, float]:
-    """ Return total and per-passenger CO2 emissions for a car route """
-
-    total  = round(param_distance_km * param_co2_kg_km, 2)
-    per_pp = round(total / max(param_passengers, 1), 2)
-
+def _car_co2(distance_km: float, passengers: int, co2_kg_km: float) -> tuple[float, float]:
+    total  = round(distance_km * co2_kg_km, 2)
+    per_pp = round(total / max(passengers, 1), 2)
     return total, per_pp
 
-# -----
 
-def train_co2(param_distance_km: float, param_passengers: int) -> tuple[float, float]:
-    """ Return total and per-passenger CO2 emissions for a train route """
-
-    total  = round(param_distance_km * TRAIN_EMISSION_KG_PER_KM, 2)
-    per_pp = round(total / max(param_passengers, 1), 2)
-
+def _train_co2(distance_km: float, passengers: int) -> tuple[float, float]:
+    total  = round(distance_km * TRAIN_EMISSION_KG_PER_KM, 2)
+    per_pp = round(total / max(passengers, 1), 2)
     return total, per_pp
+
+
+# --------------------------------------------------
+# PUBLIC API  — call this from StreamlitCalculationGenerator
+# --------------------------------------------------
+
+class EcoComparison:
+    """
+    Displays the Eco & Train Comparison section inside the existing
+    Streamlit app.  Call display_section() after the cost breakdown.
+    """
+
+    def display_section(
+        self,
+        start_location: str,
+        end_location:   str,
+        distance_km:    float,
+        rutafem_price:  float,
+        persons:        int,
+    ) -> None:
+        """
+        Render the full eco+train comparison block.
+
+        Parameters
+        ----------
+        start_location : str   — already captured by the group form
+        end_location   : str   — already captured by the group form
+        distance_km    : float — computed by OSRM in the group project
+        rutafem_price  : float — total cost computed by the group project
+        persons        : int   — number of passengers
+        """
+
+        st.divider()
+        st.subheader("🌿 Eco & Train Comparison")
+
+        # ---- Vehicle selector ----
+        selected_vehicle = st.selectbox(
+            "Select vehicle (for CO₂ estimation)",
+            options=VEHICLE_OPTIONS,
+            index=0,
+            help="Choose the car model used for the ride to compare carbon footprint with train."
+        )
+
+        co2_kg_km = _get_vehicle_co2_kg_km(selected_vehicle)
+        is_electric = co2_kg_km == 0.0
+
+        # ---- Train price lookup ----
+        df_tgv, df_inter = _load_train_prices()
+        train_floor:   float | None = None
+        train_typical: float | None = None
+        train_source:  str = ""
+        train_note:    str = ""
+
+        if df_tgv is None and df_inter is None:
+            train_note = "Train CSV files not found — add train_prices_tgv.csv and train_prices_intercites.csv."
+        else:
+            train_floor, train_typical, train_source = _get_train_price_range(
+                df_tgv, df_inter, start_location, end_location
+            )
+            if train_floor is None:
+                train_note = "Route not found in train dataset."
+
+        # ======================================================
+        # PRICE COMPARISON
+        # ======================================================
+        st.markdown("#### 💶 Price Comparison")
+
+        rutafem_per_person = round(rutafem_price / max(persons, 1), 2)
+
+        price_col1, price_col2, price_col3 = st.columns(3)
+
+        with price_col1:
+            st.metric(
+                label="🚗 Rutafem (per person)",
+                value=f"{rutafem_per_person:.2f} €",
+                help=f"Total {rutafem_price:.2f} € ÷ {persons} passenger(s)."
+            )
+            st.caption(f"Total ride: **{rutafem_price:.2f} €**")
+
+        with price_col2:
+            if train_floor is not None:
+                st.metric(
+                    label="🚄 Train (estimated range)",
+                    value=f"{train_floor:.0f} – {train_typical:.0f} €",
+                    help="Flash-sale floor to typical same-week price. Real price should fall in this range."
+                )
+                st.caption(f"Source: {train_source}")
+            else:
+                st.metric(label="🚄 Train", value="N/A")
+                st.caption(train_note)
+
+        with price_col3:
+            if train_floor is not None:
+                # Compare Rutafem against the typical (realistic) train price
+                if rutafem_per_person < train_floor:
+                    verdict = "🚗 Rutafem"
+                    detail  = f"cheaper than the cheapest train ticket ({train_floor:.0f} €)"
+                elif rutafem_per_person <= train_typical:
+                    verdict = "≈ Similar"
+                    detail  = f"Rutafem {rutafem_per_person:.2f} € is within the train range"
+                else:
+                    verdict = "🚄 Train"
+                    detail  = f"Rutafem {rutafem_per_person:.2f} € exceeds typical train price ({train_typical:.0f} €)"
+                st.metric(label="✅ Best value", value=verdict)
+                st.caption(detail)
+            else:
+                st.metric(label="✅ Best value", value="🚗 Rutafem")
+                st.caption("No train data to compare.")
+
+        # ======================================================
+        # CO2 COMPARISON
+        # ======================================================
+        st.markdown("#### 🌍 Carbon Footprint")
+
+        car_total_co2, car_pp_co2     = _car_co2(distance_km, persons, co2_kg_km)
+        train_total_co2, train_pp_co2 = _train_co2(distance_km, persons)
+
+        co2_col1, co2_col2 = st.columns(2)
+
+        with co2_col1:
+            st.markdown(f"**🚗 {selected_vehicle}**")
+            if is_electric:
+                st.info("⚡ Electric vehicle — 0 g CO₂/km (tailpipe). "
+                        "Well-to-wheel emissions depend on the energy mix.")
+                st.metric("Total CO₂ (tailpipe)", "0.00 kg")
+                st.metric("Per passenger (tailpipe)", "0.00 kg")
+            else:
+                st.metric("Total CO₂", f"{car_total_co2:.2f} kg")
+                st.metric("Per passenger", f"{car_pp_co2:.2f} kg")
+
+        with co2_col2:
+            st.markdown("**🚄 Train (ADEME avg)**")
+            st.metric("Total CO₂", f"{train_total_co2:.2f} kg")
+            st.metric("Per passenger", f"{train_pp_co2:.2f} kg")
+
+         
+
+        # ---- Methodology note ----
+        
+            cheapest_option = "car"
+        if train_floor is not None:
+            if rutafem_per_person < train_floor:
+                cheapest_option = "car"
+            elif rutafem_per_person <= train_typical:
+                cheapest_option = "similar"
+            else:
+                cheapest_option = "train"
+ 
+        return {
+            "co2_car_total_kg":        car_total_co2,
+            "co2_car_per_person_kg":   car_pp_co2,
+            "co2_train_total_kg":      train_total_co2,
+            "co2_train_per_person_kg": train_pp_co2,
+            "train_price":             train_typical  if train_typical  is not None else 0.0,
+            "ouigo_price":             train_floor    if train_floor    is not None else 0.0,
+            "cheapest_option":         cheapest_option,
+        }

@@ -7,7 +7,11 @@ from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
 from src.routing_file import get_route_osrm
 from src.calculator_file import RouteCalculator, RouteOption
-from src.eco_comparison import VEHICLE_OPTIONS, car_co2, get_train_price_range, get_vehicle_co2_kg_km, load_train_prices, train_co2
+from src.csv_export import RutafemCSVExporter, RunData
+
+# ── NEW: import the eco comparison module ──────────────────────────────────────
+from src.eco_comparison import EcoComparison
+# ──────────────────────────────────────────────────────────────────────────────
 
 # -----
 
@@ -278,64 +282,63 @@ class StreamlitCalculationGenerator:
         param_fuel_type: str,
         param_persons: int,
         param_commission: bool
-    ) -> None:
-        """ Calculate route and display results using closest gas station price or selected station """
-
+        ) -> None:
+        """Calculate route and display results — now also writes to CSV."""
+ 
         if not param_start_location or not param_end_location:
             st.error("Please provide both start and end locations")
             return None
-
+ 
         if param_fuel_type == "Select":
             st.error("Please select a fuel type")
             return None
-
+ 
         with st.spinner("Calculating route..."):
             try:
                 geocoders = Geocoders()
                 route_calculator = RouteCalculator()
-
+    
                 closest_stations = self._find_closest_stations(
                     param_start_location=param_start_location,
                     param_max_results=1,
                     param_max_distance_km=100.0
                 )
-
+    
                 closest_station = None
                 closest_fuel_price = None
-
+    
                 if closest_stations:
                     closest_station = closest_stations[0]
                     closest_fuel_price = closest_station['fuel_prices'].get(param_fuel_type)
-
+    
                 if closest_fuel_price:
                     closest_fuel_price = float(closest_fuel_price)
                     start_coords = geocoders.geocode_coordinates_method(param_start_location)
                     end_coords = geocoders.geocode_coordinates_method(param_end_location)
-
+    
                     if not start_coords or not end_coords:
                         st.error("Could not geocode one or both locations")
                         return None
-
+    
                     osrm_data = get_route_osrm(
                         origin=start_coords,
                         destination=end_coords,
                         steps=True,
                         overview="false"
                     )
-
+    
                     routes = osrm_data.get('routes', [])
                     if not routes:
                         st.error("Could not calculate route between locations")
                         return None
-
+    
                     distance = round(routes[0]['distance'] / 1000, 2)
-
-                    # Nombre de péages détectés
+    
                     toll_info = route_calculator.tolls.get_toll_details(osrm_data)
                     has_toll = toll_info['has_toll']
                     toll_count = len(toll_info['segments'])
                     detected_toll = float(toll_info['toll_cost'])
-
+    
                     cost_per_person = route_calculator.calculate_route_method(
                         distance,
                         param_liter_km,
@@ -345,7 +348,7 @@ class StreamlitCalculationGenerator:
                         param_commission
                     )
                     total_cost = cost_per_person * param_persons
-
+    
                     result = {
                         'success': True,
                         'error': None,
@@ -358,7 +361,7 @@ class StreamlitCalculationGenerator:
                         'toll_count': toll_count,
                         'detected_toll': detected_toll,
                     }
-
+    
                     self._display_success_results(
                         result,
                         param_start_location,
@@ -368,7 +371,7 @@ class StreamlitCalculationGenerator:
                         param_persons,
                         param_commission
                     )
-
+    
                     self._display_alternative_routes(
                         start_coords,
                         end_coords,
@@ -377,21 +380,64 @@ class StreamlitCalculationGenerator:
                         param_persons,
                         param_commission,
                     )
-
-                    self._display_section(
-                        param_start_location=param_start_location,
-                        param_end_location=param_end_location,
-                        param_distance_km=distance,
-                        param_rutafem_price=round(total_cost, 2),
-                        param_persons=param_persons,
+    
+                    # ── Eco & Train Comparison ────────────────────────────────
+                    eco = EcoComparison()
+                    eco_result = eco.display_section(
+                        start_location=param_start_location,
+                        end_location=param_end_location,
+                        distance_km=distance,
+                        rutafem_price=round(total_cost, 2),
+                        persons=param_persons,
                     )
-
+                    # eco_result is whatever EcoComparison.display_section() returns.
+                    # Adjust the keys below to match your actual EcoComparison API.
+                    # If display_section() returns None, pass 0.0 as defaults.
+                    eco_result = eco_result or {}
+    
+                    # ── BUILD RunData & EXPORT CSV ────────────────────────────
+                    run = RunData(
+                        # routes
+                        origin_city=param_start_location,
+                        destination_city=param_end_location,
+                        distance_km=distance,
+    
+                        # trips
+                        passengers=param_persons,
+                        rutafem_price=round(total_cost, 2),
+    
+                        # fuel
+                        fuel_type=param_fuel_type,
+                        price_per_liter=closest_fuel_price,
+                        fuel_consumption_l_100=param_liter_km,
+    
+                        # tolls
+                        toll_price=detected_toll,
+    
+                        # co2  ← pull from your EcoComparison result dict
+                        co2_car_total_kg=eco_result.get("co2_car_total_kg", 0.0),
+                        co2_car_per_person_kg=eco_result.get("co2_car_per_person_kg", 0.0),
+                        co2_train_total_kg=eco_result.get("co2_train_total_kg", 0.0),
+                        co2_train_per_person_kg=eco_result.get("co2_train_per_person_kg", 0.0),
+    
+                        # price comparison ← pull from your EcoComparison result dict
+                        train_price=eco_result.get("train_price", 0.0),
+                        ouigo_price=eco_result.get("ouigo_price", 0.0),
+                        cheapest_option=eco_result.get("cheapest_option", ""),
+                    )
+    
+                    exporter = RutafemCSVExporter(output_path="rutafem_runs.csv")
+                    exporter.offer_download(run)
+                    # ─────────────────────────────────────────────────────────
+    
                 else:
-                    st.error(f"Could not find fuel price for {param_fuel_type} at selected stations")
-
+                    st.error(
+                        f"Could not find fuel price for {param_fuel_type} at selected stations"
+                    )
+    
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
-
+    
         return None
 
     # -----
@@ -587,143 +633,3 @@ class StreamlitCalculationGenerator:
             st.warning(f"Impossible de calculer les itinéraires alternatifs : {str(e)}")
 
         return None
-
-    # -----
-
-    def _display_section(
-        self,
-        param_start_location: str,
-        param_end_location:   str,
-        param_distance_km:    float,
-        param_rutafem_price:  float,
-        param_persons:        int,
-    ) -> None:
-        """
-        Render the full eco+train comparison block.
-
-        Parameters
-        ----------
-        param_start_location : str   — already captured by the group form
-        param_end_location   : str   — already captured by the group form
-        param_distance_km    : float — computed by OSRM in the group project
-        param_rutafem_price  : float — total cost computed by the group project
-        param_persons        : int   — number of passengers
-        """
-
-        st.divider()
-        st.subheader("🌿 Eco & Train Comparison")
-
-        # ---- Vehicle selector ----
-        selected_vehicle = st.selectbox(
-            "Select vehicle (for CO₂ estimation)",
-            options=VEHICLE_OPTIONS,
-            index=0,
-            help="Choose the car model used for the ride to compare carbon footprint with train."
-        )
-
-        co2_kg_km = get_vehicle_co2_kg_km(selected_vehicle)
-        is_electric = co2_kg_km == 0.0
-
-        # ---- Train price lookup ----
-        df_tgv, df_inter = load_train_prices()
-        train_floor:   float | None = None
-        train_typical: float | None = None
-        train_source:  str = ""
-        train_note:    str = ""
-
-        if df_tgv is None and df_inter is None:
-            train_note = "Train CSV files not found — add train_prices_tgv.csv and train_prices_intercites.csv."
-        else:
-            train_floor, train_typical, train_source = get_train_price_range(
-                df_tgv, df_inter, param_start_location, param_end_location
-            )
-            if train_floor is None:
-                train_note = "Route not found in train dataset."
-
-        # ======================================================
-        # PRICE COMPARISON
-        # ======================================================
-        st.markdown("#### 💶 Price Comparison")
-
-        rutafem_per_person = round(param_rutafem_price / max(param_persons, 1), 2)
-
-        price_col1, price_col2, price_col3 = st.columns(3)
-
-        with price_col1:
-            st.metric(
-                label="🚗 Rutafem (per person)",
-                value=f"{rutafem_per_person:.2f} €",
-                help=f"Total {param_rutafem_price:.2f} € ÷ {param_persons} passenger(s)."
-            )
-            st.caption(f"Total ride: **{param_rutafem_price:.2f} €**")
-
-        with price_col2:
-            if train_floor is not None:
-                st.metric(
-                    label="🚄 Train (estimated range)",
-                    value=f"{train_floor:.0f} – {train_typical:.0f} €",
-                    help="Flash-sale floor to typical same-week price. Real price should fall in this range."
-                )
-                st.caption(f"Source: {train_source}")
-            else:
-                st.metric(label="🚄 Train", value="N/A")
-                st.caption(train_note)
-
-        with price_col3:
-            if train_floor is not None:
-                # Compare Rutafem against the typical (realistic) train price
-                if rutafem_per_person < train_floor:
-                    verdict = "🚗 Rutafem"
-                    detail  = f"cheaper than the cheapest train ticket ({train_floor:.0f} €)"
-                elif rutafem_per_person <= train_typical:
-                    verdict = "≈ Similar"
-                    detail  = f"Rutafem {rutafem_per_person:.2f} € is within the train range"
-                else:
-                    verdict = "🚄 Train"
-                    detail  = f"Rutafem {rutafem_per_person:.2f} € exceeds typical train price ({train_typical:.0f} €)"
-                st.metric(label="✅ Best value", value=verdict)
-                st.caption(detail)
-            else:
-                st.metric(label="✅ Best value", value="🚗 Rutafem")
-                st.caption("No train data to compare.")
-
-        # ======================================================
-        # CO2 COMPARISON
-        # ======================================================
-        st.markdown("#### 🌍 Carbon Footprint")
-
-        car_total_co2, car_pp_co2     = car_co2(param_distance_km, param_persons, co2_kg_km)
-        train_total_co2, train_pp_co2 = train_co2(param_distance_km, param_persons)
-
-        co2_col1, co2_col2 = st.columns(2)
-
-        with co2_col1:
-            st.markdown(f"**🚗 {selected_vehicle}**")
-            if is_electric:
-                st.info("⚡ Electric vehicle — 0 g CO₂/km (tailpipe). "
-                        "Well-to-wheel emissions depend on the energy mix.")
-                st.metric("Total CO₂ (tailpipe)", "0.00 kg")
-                st.metric("Per passenger (tailpipe)", "0.00 kg")
-            else:
-                st.metric("Total CO₂", f"{car_total_co2:.2f} kg")
-                st.metric("Per passenger", f"{car_pp_co2:.2f} kg")
-
-        with co2_col2:
-            st.markdown("**🚄 Train (ADEME avg)**")
-            st.metric("Total CO₂", f"{train_total_co2:.2f} kg")
-            st.metric("Per passenger", f"{train_pp_co2:.2f} kg")
-
-        # ---- Savings banner ----
-        if not is_electric and car_pp_co2 > 0:
-            saved_kg = round(car_pp_co2 - train_pp_co2, 2)
-            if saved_kg < 0:
-                st.info(
-                    f"ℹ️ The {selected_vehicle} emits less CO₂ per passenger "
-                    f"than the train on this journey "
-                    f"({abs(saved_kg):.2f} kg difference per person)."
-                )
-        elif is_electric:
-            st.success(
-                "⚡ Electric vehicle has zero tailpipe emissions — "
-                "environmentally comparable to or better than train travel."
-            )
