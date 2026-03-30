@@ -5,8 +5,9 @@ import streamlit as st
 from typing import List
 from src.gasoline_file import Gasoline
 from src.geocoders_file import Geocoders
-from src.routing_file import get_route_osrm
-from src.calculator_file import RouteCalculator, RouteOption
+from src.tolls_file import estimate_route_toll
+from src.routing_file import get_route_osrm_method
+from src.calculator_file import RouteCalculator, Route
 from src.eco_comparison import VEHICLE_OPTIONS, car_co2, get_train_price_range, get_vehicle_co2_kg_km, load_train_prices, train_co2
 
 # -----
@@ -38,8 +39,12 @@ class StreamlitCalculationGenerator:
     def streamlit_interface_method(self) -> None:
         """ Create the Streamlit interface for route calculation """
 
-        self._configure_page()
-        self._display_title()
+        st.set_page_config(
+            page_title="Rutafem - Route Calculator",
+            layout="centered",
+            initial_sidebar_state="expanded"
+        )
+        st.title("Rutafem - Route Calculator")
 
         # Get user inputs
         commission = self._get_commission_input()
@@ -51,28 +56,6 @@ class StreamlitCalculationGenerator:
             self._calculate_and_display_route(
                 start_location, end_location, liter_km, fuel_type, persons, commission
             )
-
-        return None
-
-    # -----
-
-    def _configure_page(self) -> None:
-        """ Configure Streamlit page settings """
-
-        st.set_page_config(
-            page_title="Rutafem - Route Calculator",
-            layout="centered",
-            initial_sidebar_state="expanded"
-        )
-
-        return None
-
-    # -----
-
-    def _display_title(self) -> None:
-        """ Display page title """
-
-        st.title("Rutafem - Route Calculator")
 
         return None
 
@@ -311,6 +294,7 @@ class StreamlitCalculationGenerator:
 
                 if closest_fuel_price:
                     closest_fuel_price = float(closest_fuel_price)
+
                     start_coords = geocoders.geocode_coordinates_method(param_start_location)
                     end_coords = geocoders.geocode_coordinates_method(param_end_location)
 
@@ -318,11 +302,11 @@ class StreamlitCalculationGenerator:
                         st.error("Could not geocode one or both locations")
                         return None
 
-                    osrm_data = get_route_osrm(
-                        origin=start_coords,
-                        destination=end_coords,
-                        steps=True,
-                        overview="false"
+                    osrm_data = get_route_osrm_method(
+                        param_origin=start_coords,
+                        param_destination=end_coords,
+                        param_steps=True,
+                        param_overview="false"
                     )
 
                     routes = osrm_data.get('routes', [])
@@ -333,43 +317,25 @@ class StreamlitCalculationGenerator:
                     distance = round(routes[0]['distance'] / 1000, 2)
 
                     # Nombre de péages détectés
-                    toll_info = route_calculator.tolls.get_toll_details(osrm_data)
+                    toll_info = estimate_route_toll(osrm_data)
                     has_toll = toll_info['has_toll']
                     toll_count = len(toll_info['segments'])
                     detected_toll = float(toll_info['toll_cost'])
 
-                    cost_per_person = route_calculator.calculate_route_method(
-                        distance,
-                        param_liter_km,
-                        closest_fuel_price,
-                        detected_toll,
-                        param_persons,
-                        param_commission
+                    # Create Route object using the calculator
+                    route = route_calculator.calculate_route_method(
+                        param_distance=distance,
+                        param_liter_km=param_liter_km,
+                        param_fuel_price=closest_fuel_price,
+                        param_toll=detected_toll,
+                        param_persons=param_persons,
+                        param_commission=param_commission,
+                        param_has_toll=has_toll,
+                        param_toll_count=toll_count,
+                        param_closest_station=closest_station
                     )
-                    total_cost = cost_per_person * param_persons
 
-                    result = {
-                        'success': True,
-                        'error': None,
-                        'cost_per_person': cost_per_person,
-                        'total_cost': round(total_cost, 2),
-                        'distance': distance,
-                        'fuel_price': closest_fuel_price,
-                        'closest_station': closest_station,
-                        'has_toll': has_toll,
-                        'toll_count': toll_count,
-                        'detected_toll': detected_toll,
-                    }
-
-                    self._display_success_results(
-                        result,
-                        param_start_location,
-                        param_end_location,
-                        param_liter_km,
-                        param_fuel_type,
-                        param_persons,
-                        param_commission
-                    )
+                    self._display_success_results(route)
 
                     self._display_alternative_routes(
                         start_coords,
@@ -384,7 +350,7 @@ class StreamlitCalculationGenerator:
                         param_start_location=param_start_location,
                         param_end_location=param_end_location,
                         param_distance_km=distance,
-                        param_rutafem_price=round(total_cost, 2),
+                        param_rutafem_price=route.total_cost,
                         param_persons=param_persons,
                     )
 
@@ -398,115 +364,71 @@ class StreamlitCalculationGenerator:
 
     # -----
 
-    def _display_success_results(
-        self,
-        param_result: dict,
-        param_start_location: str,
-        param_end_location: str,
-        param_liter_km: float,
-        param_fuel_type: str,
-        param_persons: int,
-        param_commission: bool
-    ) -> None:
+    def _display_success_results(self, param_route: Route) -> None:
         """ Display successful calculation results """
 
-        if param_result.get('closest_station'):
+        if param_route.closest_station:
             st.info(
-                f"Fuel price from: **{param_result['closest_station']['address']}** "
-                f"({param_result['closest_station']['distance_km']} km away)"
+                f"Fuel price from: **{param_route.closest_station['address']}** "
+                f"({param_route.closest_station['distance_km']} km away)"
             )
 
-        self._display_key_metrics(param_result)
-        self._display_summary(
-            param_start_location,
-            param_end_location,
-            param_liter_km,
-            param_fuel_type,
-            param_persons,
-            param_result["has_toll"],
-            param_result["toll_count"],
-            param_result["detected_toll"],
-        )
-        self._display_cost_breakdown(
-            param_result,
-            param_persons,
-            param_commission
-        )
+        self._display_key_metrics(param_route)
+        self._display_summary(param_route)
+        self._display_cost_breakdown(param_route)
 
         return None
 
     # -----
 
-    def _display_key_metrics(self, param_result: dict) -> None:
+    def _display_key_metrics(self, param_route: Route) -> None:
         """ Display distance, fuel price, and total cost """
 
         distance_col, fuel_col, total_col = st.columns(3)
         with distance_col:
-            st.metric("Distance", f"{param_result['distance']:.2f} km")
+            st.metric("Distance", f"{param_route.distance_km:.2f} km")
 
         with fuel_col:
-            st.metric("Fuel Price", f"€{param_result['fuel_price']}/L")
+            st.metric("Prix essence", f"€{param_route.fuel_price:.2f}/L")
 
         with total_col:
-            st.metric("Total Cost", f"€{param_result['total_cost']:.2f}")
-
-        return None
+            st.metric("Coût Total", f"€{param_route.total_cost:.2f}")
 
     # -----
 
-    def _display_summary(
-        self,
-        param_start_location: str,
-        param_end_location: str,
-        param_liter_km: float,
-        param_fuel_type: str,
-        param_persons: int,
-        param_has_toll: bool,
-        param_toll_count: int,
-        param_detected_toll: float
-    ) -> None:
+    def _display_summary(self, param_route: Route) -> None:
         """ Display data summary """
 
-        st.subheader("Data Summary")
+        st.subheader("Résumé des donnéesÒ")
 
         data_summary_col1, data_summary_col2 = st.columns(2)
         with data_summary_col1:
-            st.write(f"**Start:** {param_start_location}")
-            st.write(f"**End:** {param_end_location}")
-            st.write(f"**Fuel Type:** {param_fuel_type}")
+            st.write(f"**Distance:** {param_route.distance_km} km")
+            st.write(f"**Prix essence:** €{param_route.fuel_price:.2f}/L")
+            st.write(f"**Coût du carburant:** €{param_route.fuel_cost:.2f}")
 
         with data_summary_col2:
-            st.write(f"**Fuel Consumption:** {param_liter_km} L/100km")
-            st.write(f"**Toll:** {param_detected_toll:.2f}€")
-            if param_has_toll:
-                st.write("**Toll detected:**  Yes")
-                st.write(f"**Toll count:** {param_toll_count}")
+            st.write(f"**Péage:** €{param_route.toll_cost:.2f}")
+            if param_route.has_toll:
+                st.write("**Péage détecté:** Oui")
+                st.write(f"**Nombre de péages:** {param_route.toll_count}")
             else:
-                st.write("**Toll detected:**  No")
-                st.write("**Toll count:** 0")
-            st.write(f"**Persons:** {param_persons}")
+                st.write("**Péage détecté:** Non")
+                st.write("**Nombre de péages:** 0")
 
         return None
 
     # -----
 
-    def _display_cost_breakdown(
-        self,
-        param_result: dict,
-        param_persons: int,
-        param_commission: bool
-    ) -> None:
+    def _display_cost_breakdown(self, param_route: Route) -> None:
         """ Display cost breakdown """
 
-        if param_commission:
-            st.subheader(f"Cost Breakdown (including 15% commission)")
-        else:
-            st.subheader(f"Cost Breakdown (no commission)")
+        st.subheader("Répartition des coûts")
 
         cost_breakdown = {
-            "Fuel Cost": param_result['total_cost'] - param_result['detected_toll'],
-            "Toll": param_result['detected_toll'],
-            "Total": param_result['total_cost']
+            "Coût du carburant": param_route.fuel_cost,
+            "Péage": param_route.toll_cost,
+            "Total": param_route.total_cost
         }
 
         breakdown_col1, breakdown_col2 = st.columns(2)
@@ -518,8 +440,7 @@ class StreamlitCalculationGenerator:
         with breakdown_col2:
             st.metric(
                 "Cost per person",
-                f"{param_result['cost_per_person']:.2f}€",
-                delta=f"÷ {param_persons} persons"
+                f"{param_route.cost_per_person:.2f}€",
             )
 
         return None
@@ -528,24 +449,24 @@ class StreamlitCalculationGenerator:
 
     def _display_alternative_routes(
         self,
-        start_coords: tuple,
-        end_coords: tuple,
-        liter_km: float,
-        fuel_price: float,
-        persons: int,
-        commission: bool,
+        param_start_coords: tuple,
+        param_end_coords: tuple,
+        param_liter_km: float,
+        param_fuel_price: float,
+        param_persons: int,
+        param_commission: bool,
     ) -> None:
         """ Fetch and display alternative routes comparison """
 
         try:
             route_calculator = RouteCalculator()
-            routes: List[RouteOption] = route_calculator.get_alternative_routes(
-                param_start_coords=start_coords,
-                param_end_coords=end_coords,
-                param_liter_per_100km=liter_km,
-                param_fuel_price_per_liter=fuel_price,
-                param_persons=persons,
-                param_commission=commission,
+            routes: List[Route] = route_calculator.get_alternative_routes(
+                param_start_coords=param_start_coords,
+                param_end_coords=param_end_coords,
+                param_liter_per_100km=param_liter_km,
+                param_fuel_price_per_liter=param_fuel_price,
+                param_persons=param_persons,
+                param_commission=param_commission,
             )
 
             if not routes:

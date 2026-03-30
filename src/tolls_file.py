@@ -100,13 +100,3 @@ def estimate_route_toll(osrm_data: Dict) -> Dict:
         "toll_cost": cost,
         "segments": segments
     }
-
-# -----
-
-class Tolls:
-    """ Class to handle toll cost estimation based on OSRM route data """
-
-    def get_toll_details(self, osrm_data: Dict) -> Dict:
-        """ Estimate toll details for a given OSRM route data """
-
-        return estimate_route_toll(osrm_data)
