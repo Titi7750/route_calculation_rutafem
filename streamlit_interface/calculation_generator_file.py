@@ -228,7 +228,7 @@ class StreamlitCalculationGenerator:
 
         fuel_type = st.sidebar.selectbox(
             "Type de carburant",
-            ["Sélectionner", "SP95", "SP98", "Gazole", "GPLc", "E10"],
+            ["Sélectionner", "SP95", "SP98", "Gazole", "GPLc", "E10", "E85"],
             index=0
         )
 
