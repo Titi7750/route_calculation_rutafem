@@ -171,19 +171,11 @@ class StreamlitCalculationGenerator:
         """ Display nearby gas stations for the start location """
 
         try:
-            search_radius = st.slider(
-                "Search radius (km)",
-                min_value=10,
-                max_value=100,
-                value=50,
-                step=10
-            )
-
             with st.spinner("Finding nearby gas stations..."):
                 closest_stations = self._find_closest_stations(
                     param_start_location=start_location,
                     param_max_results=5,
-                    param_max_distance_km=search_radius
+                    param_max_distance_km=10.0
                 )
 
                 if closest_stations:
@@ -209,7 +201,7 @@ class StreamlitCalculationGenerator:
 
                             st.divider()
                 else:
-                    st.warning(f"No gas stations found within {search_radius}km of {start_location}")
+                    st.warning("No nearby gas stations found within 10 km of the start location.")
 
         except Exception as e:
             st.error(f"Error finding gas stations: {str(e)}")
