@@ -52,10 +52,14 @@ class StreamlitCalculationGenerator:
         liter_km, fuel_type = self._get_fuel_inputs()
         persons = self._get_persons_inputs()
 
-        if st.sidebar.button("Calculer l'itinéraire", use_container_width=True):
+        calculate_clicked = st.sidebar.button("Calculer l'itinéraire", use_container_width=True)
+
+        if calculate_clicked:
             self._calculate_and_display_route(
                 start_location, end_location, liter_km, fuel_type, persons, commission
             )
+        elif "calculation_result" in st.session_state:
+            self._render_cached_calculation()
 
         return None
 
@@ -327,30 +331,58 @@ class StreamlitCalculationGenerator:
                         param_closest_station=closest_station
                     )
 
-                    self._display_success_results(route)
+                    st.session_state.calculation_result = {
+                        "start_location": param_start_location,
+                        "end_location": param_end_location,
+                        "start_coords": start_coords,
+                        "end_coords": end_coords,
+                        "distance": distance,
+                        "route": route,
+                        "param_liter_km": param_liter_km,
+                        "closest_fuel_price": closest_fuel_price,
+                        "param_persons": param_persons,
+                        "param_commission": param_commission,
+                    }
 
-                    self._display_alternative_routes(
-                        start_coords,
-                        end_coords,
-                        param_liter_km,
-                        closest_fuel_price,
-                        param_persons,
-                        param_commission,
-                    )
-
-                    self._display_section(
-                        param_start_location=param_start_location,
-                        param_end_location=param_end_location,
-                        param_distance_km=distance,
-                        param_rutafem_price=route.total_cost,
-                        param_persons=param_persons,
-                    )
+                    self._render_cached_calculation()
 
                 else:
                     st.error(f"Could not find fuel price for {param_fuel_type} at selected stations")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
+
+        return None
+
+    # -----
+
+    def _render_cached_calculation(self) -> None:
+        """ Render the most recent calculation stored in session state """
+
+        calculation_result = st.session_state.get("calculation_result")
+        if not calculation_result:
+            return None
+
+        route = calculation_result["route"]
+
+        self._display_success_results(route)
+
+        self._display_alternative_routes(
+            calculation_result["start_coords"],
+            calculation_result["end_coords"],
+            calculation_result["param_liter_km"],
+            calculation_result["closest_fuel_price"],
+            calculation_result["param_persons"],
+            calculation_result["param_commission"],
+        )
+
+        self._display_section(
+            param_start_location=calculation_result["start_location"],
+            param_end_location=calculation_result["end_location"],
+            param_distance_km=calculation_result["distance"],
+            param_rutafem_price=route.total_cost,
+            param_persons=calculation_result["param_persons"],
+        )
 
         return None
 
