@@ -1,0 +1,7 @@
+origin_city,destination_city,distance_km,routes_created_at,passengers,rutafem_price,travel_date,toll_price,fuel_type,price_per_liter,fuel_date,co2_car_total_kg,co2_car_per_person_kg,co2_train_total_kg,co2_train_per_person_kg,train_price,ouigo_price,cheapest_option,run_timestamp
+Paris,Bordeaux,581.32,2026-03-28T16:45:39,3,146.85,2026-03-28,61.13,Gazole,2.29,2026-03-28,53.48,17.83,11.63,3.88,51.0,19.0,train,2026-03-28T16:45:39
+Paris,Bordeaux,581.32,2026-03-28T16:50:38,3,146.85,2026-03-28,61.13,Gazole,2.29,2026-03-28,53.48,17.83,11.63,3.88,51.0,0.0,train,2026-03-28T16:50:38
+Paris,Bordeaux,581.32,2026-03-28T16:52:46,3,146.85,2026-03-28,61.13,Gazole,2.29,2026-03-28,53.48,17.83,11.63,3.88,51.0,19.0,train,2026-03-28T16:52:46
+Paris,Marseille,771.92,2026-03-28T16:53:44,3,199.98,2026-03-28,85.52,Gazole,2.29,2026-03-28,71.02,23.67,15.44,5.15,55.0,19.0,train,2026-03-28T16:53:44
+Paris,Marseille,771.92,2026-03-28T17:05:01,3,199.98,2026-03-28,85.52,Gazole,2.29,2026-03-28,71.02,23.67,15.44,5.15,0.0,0.0,car,2026-03-28T17:05:01
+Paris,Lyon,462.52,2026-03-28T17:08:09,3,119.31,2026-03-28,50.8,Gazole,2.29,2026-03-28,42.55,14.18,9.25,3.08,49.0,16.0,similar,2026-03-28T17:08:09
