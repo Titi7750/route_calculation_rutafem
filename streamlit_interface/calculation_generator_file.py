@@ -40,11 +40,11 @@ class StreamlitCalculationGenerator:
         """ Create the Streamlit interface for route calculation """
 
         st.set_page_config(
-            page_title="Rutafem - Route Calculator",
+            page_title="Rutafem - Calculateur d'itinéraire",
             layout="centered",
             initial_sidebar_state="expanded"
         )
-        st.title("Rutafem - Route Calculator")
+        st.title("Rutafem - Calculateur d'itinéraire")
 
         # Get user inputs
         commission = self._get_commission_input()
@@ -52,7 +52,7 @@ class StreamlitCalculationGenerator:
         liter_km, fuel_type = self._get_fuel_inputs()
         persons = self._get_persons_inputs()
 
-        if st.sidebar.button("Calculate Route", use_container_width=True):
+        if st.sidebar.button("Calculer l'itinéraire", use_container_width=True):
             self._calculate_and_display_route(
                 start_location, end_location, liter_km, fuel_type, persons, commission
             )
@@ -112,7 +112,7 @@ class StreamlitCalculationGenerator:
     def _get_location_inputs(self) -> tuple[str, str]:
         """ Get start and end location inputs with all french cities from API """
 
-        st.sidebar.header("Route Parameters")
+        st.sidebar.header("Paramètres de l'itinéraire")
 
         all_french_cities = self._get_all_french_cities_from_api()
 
@@ -221,9 +221,9 @@ class StreamlitCalculationGenerator:
     def _get_fuel_inputs(self) -> tuple[float, str]:
         """ Get fuel consumption and fuel type inputs """
 
-        st.sidebar.subheader("Fuel Parameters")
+        st.sidebar.subheader("Carburant")
         liter_km = st.sidebar.slider(
-            "Fuel consumption (L/100km)",
+            "Consommation de carburant (L/100km)",
             min_value=3.0,
             max_value=15.0,
             value=5.0,
@@ -231,8 +231,8 @@ class StreamlitCalculationGenerator:
         )
 
         fuel_type = st.sidebar.selectbox(
-            "Fuel type",
-            ["Select", "SP95", "SP98", "Gazole", "GPLc", "E10"],
+            "Type de carburant",
+            ["Sélectionner", "SP95", "SP98", "Gazole", "GPLc", "E10"],
             index=0
         )
 
@@ -243,9 +243,9 @@ class StreamlitCalculationGenerator:
     def _get_persons_inputs(self) -> int:
         """ Get number of persons inputs """
 
-        st.sidebar.subheader("Number of Persons")
+        st.sidebar.subheader("Nombre de personnes")
         persons = st.sidebar.slider(
-            "Persons",
+            "Personnes partageant le trajet",
             min_value=1,
             max_value=5,
             value=3
@@ -369,8 +369,8 @@ class StreamlitCalculationGenerator:
 
         if param_route.closest_station:
             st.info(
-                f"Fuel price from: **{param_route.closest_station['address']}** "
-                f"({param_route.closest_station['distance_km']} km away)"
+                f"Station la plus proche: **{param_route.closest_station['address']}** "
+                f"({param_route.closest_station['distance_km']} km de votre point de départ)"
             )
 
         self._display_key_metrics(param_route)
@@ -399,7 +399,7 @@ class StreamlitCalculationGenerator:
     def _display_summary(self, param_route: Route) -> None:
         """ Display data summary """
 
-        st.subheader("Résumé des donnéesÒ")
+        st.subheader("Résumé des données")
 
         data_summary_col1, data_summary_col2 = st.columns(2)
         with data_summary_col1:
@@ -439,8 +439,8 @@ class StreamlitCalculationGenerator:
 
         with breakdown_col2:
             st.metric(
-                "Cost per person",
-                f"{param_route.cost_per_person:.2f}€",
+                "Coût par personne",
+                f"{param_route.cost_per_person:.2f}€"
             )
 
         return None
