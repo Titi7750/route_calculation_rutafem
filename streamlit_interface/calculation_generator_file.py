@@ -11,7 +11,7 @@ from src.calculator_file import RouteCalculator, Route
 from src.csv_export import RutafemCSVExporter, RunData
 
 # ── NEW: import the eco comparison module ──────────────────────────────────────
-from src.eco_comparison import EcoComparison, VEHICLE_OPTIONS, car_co2, get_train_price_range, get_vehicle_co2_kg_km, load_train_prices, train_co2
+from src.eco_comparison import EcoComparison, VEHICLE_OPTIONS
 # ──────────────────────────────────────────────────────────────────────────────
 
 # -----
