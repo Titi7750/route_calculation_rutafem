@@ -34,8 +34,6 @@ class Route:
         self.has_toll = has_toll
         self.toll_count = toll_count
         self.closest_station = closest_station or {}
-        self.index = index
-        self.tags = tags or []
 
 # -----
 
@@ -95,77 +93,3 @@ class RouteCalculator:
             toll_count=param_toll_count,
             closest_station=param_closest_station,
         )
-
-    # -----
-
-    def get_alternative_routes(
-        self,
-        param_start_coords: Tuple[float, float],
-        param_end_coords: Tuple[float, float],
-        param_liter_per_100km: float,
-        param_fuel_price_per_liter: float,
-        param_persons: int,
-        param_commission: bool,
-        param_max_alternatives: int = 2,
-    ) -> List[Route]:
-        """ Fetch up to max_alternatives+1 routes from OSRM and compute costs for each """
-
-        osrm_data = get_route_osrm_method(
-            param_origin=param_start_coords,
-            param_destination=param_end_coords,
-            param_alternatives=True,
-            param_steps=True,
-        )
-
-        routes = osrm_data.get("routes", [])[:param_max_alternatives + 1]
-
-        options: List[Route] = []
-        for idx, route in enumerate(routes, start=1):
-            distance_km = round(route["distance"] / 1000, 2)
-            duration_min = round(route["duration"] / 60, 1)
-
-            toll_info = estimate_route_toll({"routes": [route]})
-            toll_cost = float(toll_info["toll_cost"])
-            has_toll = toll_info['has_toll']
-            toll_count = len(toll_info['segments'])
-
-            # Use calculate_route_method to get all cost details
-            route_obj = self.calculate_route_method(
-                param_distance=distance_km,
-                param_liter_km=param_liter_per_100km,
-                param_fuel_price=param_fuel_price_per_liter,
-                param_toll=toll_cost,
-                param_persons=param_persons,
-                param_commission=param_commission,
-                param_has_toll=has_toll,
-                param_toll_count=toll_count,
-                param_closest_station={},  # Not needed for alternatives
-            )
-
-            # Update route object with alternative-specific data
-            route_obj.index = idx
-            route_obj.duration_min = duration_min
-            options.append(route_obj)
-
-        return self._tag_routes(options)
-
-    # -----
-
-    def _tag_routes(self, param_route: List[Route]) -> List[Route]:
-        """ Tag routes as cheapest, fastest, or toll-free """
-
-        if not param_route:
-            return param_route
-
-        cheapest = min(param_route, key=lambda road: road.total_cost)
-        fastest = min(param_route, key=lambda road: road.duration_min)
-
-        for route in param_route:
-            if route is cheapest:
-                route.tags.append("le moins cher")
-            if route is fastest:
-                route.tags.append("le plus rapide")
-            if route.toll_cost == 0:
-                route.tags.append("sans péage")
-
-        return param_route
