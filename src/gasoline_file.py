@@ -3,7 +3,6 @@
 import os
 import json
 import shutil
-import threading
 import subprocess
 import pandas as pd
 from datetime import datetime, timedelta
@@ -13,8 +12,6 @@ from datetime import datetime, timedelta
 class Gasoline:
     """ Class to retrieve data from different extension files """
 
-    _parquet_initialized = False
-    _init_lock = threading.Lock()
     REFRESH_INTERVAL_HOURS = 24
 
     def __init__(self):
@@ -24,12 +21,7 @@ class Gasoline:
             "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/parquet"
         )
 
-        # Ensure parquet sync runs once per application process startup.
-        if not Gasoline._parquet_initialized:
-            with Gasoline._init_lock:
-                if not Gasoline._parquet_initialized:
-                    self._download_parquet_file_method()
-                    Gasoline._parquet_initialized = True
+        self._download_parquet_file_method()
 
     # -----
 

@@ -9,6 +9,10 @@ from src.tolls_file import estimate_route_toll
 from src.routing_file import get_route_osrm_method
 from src.calculator_file import RouteCalculator, Route
 
+@st.cache_resource(ttl=24 * 3600)
+def _get_gasoline_instance() -> Gasoline:
+    return Gasoline()
+
 # -----
 
 class StreamlitCalculationGenerator:
@@ -22,7 +26,7 @@ class StreamlitCalculationGenerator:
     ) -> list[dict]:
         """ Load fuel data and return closest stations for a location """
 
-        gasoline = Gasoline()
+        gasoline = _get_gasoline_instance()
         geocoders = Geocoders()
         fuel_data = gasoline.get_data_fuel_method()
 
@@ -37,6 +41,8 @@ class StreamlitCalculationGenerator:
 
     def streamlit_interface_method(self) -> None:
         """ Create the Streamlit interface for route calculation """
+
+        _get_gasoline_instance()
 
         st.set_page_config(
             page_title="Rutafem - Calculateur d'itinéraire",
